@@ -1,7 +1,7 @@
 FROM restic/restic:0.19.1 AS restic-bin
 FROM rclone/rclone:v1.74-stable AS rclone-bin
 
-FROM python:3.12-bookworm
+FROM python:3.14-bookworm
 
 COPY --from=restic-bin /usr/bin/restic /usr/local/bin/restic
 COPY --from=rclone-bin /usr/local/bin/rclone /usr/local/bin/rclone
