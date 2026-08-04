@@ -1,0 +1,89 @@
+<div class="panel">
+  <div class="panel-header">
+    <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+      {% if form.mode == "edit" %}Edit remote{% else %}Create remote{% endif %}
+    </span>
+  </div>
+
+  {% if not form.supported %}
+  <div class="panel-body">
+    <div class="empty-state">
+      This remote type is not supported by the schema editor. Please use the raw editor.
+    </div>
+  </div>
+  {% else %}
+  <form method="post"
+        action="{{ '/config/remotes/' ~ form.remote if form.mode == 'edit' else '/config/remotes' }}"
+        class="panel-body grid gap-4">
+    {% if form.mode == "create" %}
+    <div>
+      <label class="form-label">Remote name</label>
+      <input type="text" name="remote_name" value="{{ form.remote_name }}" required class="form-control font-mono">
+      {% if form.errors.name %}<p class="form-help text-red-700">{{ form.errors.name }}</p>{% endif %}
+    </div>
+    <div>
+      <label class="form-label">Backend</label>
+      <select name="remote_type"
+              hx-get="/config/remotes/form"
+              hx-target="#rclone-form-panel"
+              hx-include="closest form"
+              class="form-control">
+        {% for choice in form.backend_choices %}
+        <option value="{{ choice.value }}" {% if form.remote_type == choice.value %}selected{% endif %}>{{ choice.label }}</option>
+        {% endfor %}
+      </select>
+      {% if form.errors.type %}<p class="form-help text-red-700">{{ form.errors.type }}</p>{% endif %}
+    </div>
+    {% else %}
+    <input type="hidden" name="remote_type" value="{{ form.remote_type }}">
+    <div>
+      <label class="form-label">Remote</label>
+      <input type="text" value="{{ form.remote }}" disabled class="form-control font-mono">
+    </div>
+    {% endif %}
+
+    {% for field in form.fields %}
+    <div>
+      <label class="form-label">{{ field.label }}</label>
+      {% if field.kind == "bool" %}
+      <select name="{{ field.name }}" class="form-control">
+        <option value="">—</option>
+        <option value="true" {% if field.value == "true" %}selected{% endif %}>yes</option>
+        <option value="false" {% if field.value == "false" %}selected{% endif %}>no</option>
+      </select>
+      {% elif field.kind == "select" %}
+      <select name="{{ field.name }}" class="form-control" {% if field.required %}required{% endif %}>
+        <option value="">—</option>
+        {% for choice in field.choices %}
+        <option value="{{ choice }}" {% if field.value == choice %}selected{% endif %}>{{ choice }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <input type="{{ 'number' if field.kind == 'number' else 'password' if field.kind == 'password' else 'text' }}"
+             name="{{ field.name }}"
+             value="{{ field.value }}"
+             placeholder="{{ field.placeholder }}"
+             {% if field.required %}required{% endif %}
+             class="form-control{% if field.kind != 'password' %} font-mono{% endif %}">
+      {% endif %}
+      {% if form.errors[field.name] %}<p class="form-help text-red-700">{{ form.errors[field.name] }}</p>{% endif %}
+      {% if field.help_text %}<p class="form-help">{{ field.help_text }}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="btn btn-primary btn-sm">
+        {% if form.mode == "edit" %}Save{% else %}Create{% endif %}
+      </button>
+      {% if form.mode == "edit" %}
+      <button type="submit"
+              formaction="/config/remotes/{{ form.remote }}/delete"
+              onclick='return confirm("Really delete remote " + {{ form.remote | tojson }} + "?")'
+              class="btn btn-danger btn-sm">
+        Delete
+      </button>
+      {% endif %}
+    </div>
+  </form>
+  {% endif %}
+</div>

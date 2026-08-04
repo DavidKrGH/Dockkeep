@@ -1,0 +1,79 @@
+{% from "_macros.html" import alert_error, alert_success %}
+
+{{ alert_error(error) }}
+{{ alert_success(success) }}
+
+{% if result and result.output %}
+<div class="panel mb-4">
+  <div class="panel-header">
+    <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">rclone output</span>
+    {% if result.exit_code is not none %}
+    <span class="badge {{ 'badge-success' if result.ok else 'badge-danger' }}">Exit {{ result.exit_code }}</span>
+    {% endif %}
+  </div>
+  <pre class="panel-body overflow-x-auto text-xs font-mono whitespace-pre-wrap">{{ result.output }}</pre>
+</div>
+{% endif %}
+
+<div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">Configured remotes</span>
+    </div>
+
+    {% if remote_rows %}
+    <div class="overflow-x-auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Usage</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for remote in remote_rows %}
+          <tr>
+            <td class="font-mono text-xs text-slate-700 dark:text-slate-300">{{ remote.name }}</td>
+            <td class="text-xs text-slate-500 dark:text-slate-400">{{ remote.type or "—" }}</td>
+            <td>
+              <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">rclone:{{ remote.name }}:&lt;path&gt;</code>
+              {% if not remote.supported %}
+              <span class="badge badge-warning ml-2">Raw</span>
+              {% endif %}
+            </td>
+            <td id="status-{{ loop.index0 }}">
+              <span class="badge badge-neutral">Not checked</span>
+            </td>
+            <td class="whitespace-nowrap">
+              {% if remote.supported %}
+              <button hx-get="/config/remotes/form?remote={{ remote.name | urlencode }}&remote_type={{ remote.type | urlencode }}"
+                      hx-target="#rclone-form-panel"
+                      hx-swap="innerHTML"
+                      class="btn btn-secondary btn-sm">Edit</button>
+              {% endif %}
+              <button hx-post="/config/remotes/{{ remote.name }}/test"
+                      hx-target="#status-{{ loop.index0 }}"
+                      hx-swap="innerHTML"
+                      class="btn btn-secondary btn-sm">Test</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="panel-body">
+      <div class="empty-state">
+        {% if conf_missing %}No rclone.conf found yet.{% else %}No remotes configured.{% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div id="rclone-form-panel">
+    {% include "fragments/rclone_remote_form.html" %}
+  </div>
+</div>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Dockkeep{% endblock %}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', path='/img/dockkeep-icon.png') }}?v={{ asset_version }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/app.css') }}?v={{ asset_version }}">
+  <script>
+    (function() {
+      const t = localStorage.getItem('theme');
+      if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches))
+        document.documentElement.classList.add('dark');
+    })();
+  </script>
+  <script src="{{ url_for('static', path='/js/htmx.min.js') }}?v={{ asset_version }}" defer></script>
+  <script src="{{ url_for('static', path='/js/app.js') }}?v={{ asset_version }}" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 min-h-screen text-slate-800 dark:text-slate-200">
+
+  <header class="admin-header bg-slate-900 dark:bg-slate-950 sticky top-0 z-50 shadow-lg">
+    <div class="admin-header-inner max-w-7xl mx-auto px-6 flex items-stretch">
+
+      <a href="/" class="admin-brand flex items-center gap-2.5 shrink-0 group">
+        <span class="admin-brand-mark">
+          <img src="{{ url_for('static', path='/img/dockkeep-icon.png') }}?v={{ asset_version }}"
+               class="admin-brand-icon"
+               alt=""
+               aria-hidden="true">
+        </span>
+        <span class="admin-brand-label text-white group-hover:text-blue-300 transition-colors">
+          Dockkeep
+        </span>
+      </a>
+
+      <nav class="admin-nav flex items-stretch gap-0.5">
+        {% set nav_items = [
+          ("/",             "Dashboard"),
+          ("/runs",         "Runs"),
+          ("/repositories", "Repositories"),
+          ("/config/jobs", "Configuration"),
+          ("/diagnostics/logs", "Diagnostics"),
+          ("/help",         "Help"),
+        ] %}
+        {% for href, label in nav_items %}
+          {% if label == "Configuration" %}
+            {% set is_active = request.url.path.startswith("/config") %}
+          {% elif label == "Diagnostics" %}
+            {% set is_active = request.url.path.startswith("/diagnostics") %}
+          {% elif label == "Help" %}
+            {% set is_active = request.url.path.startswith("/help") %}
+          {% else %}
+            {% set is_active = (request.url.path == href) if href == "/" else request.url.path.startswith(href) %}
+          {% endif %}
+          <a href="{{ href }}"
+             class="flex items-center border-b-2 transition-colors
+                    {{ 'border-blue-400 text-white' if is_active else 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600' }}">
+            {{ label }}
+          </a>
+        {% endfor %}
+      </nav>
+
+      <button onclick="toggleDark()"
+              type="button"
+              class="ml-auto flex items-center justify-center w-9 h-9 my-auto rounded-md
+                     text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              aria-label="Toggle appearance"
+              title="Toggle appearance">
+        <svg id="icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
+        <svg id="icon-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="5"/>
+          <path stroke-linecap="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
+
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

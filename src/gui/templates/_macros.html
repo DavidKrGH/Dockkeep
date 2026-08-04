@@ -1,0 +1,173 @@
+{% macro help_link(anchor, label) %}
+<a href="/help#{{ anchor }}"
+   class="text-link-muted"
+   aria-label="{{ label }}"
+   title="{{ label }}">?</a>
+{% endmacro %}
+
+{% macro page_header(title, subtitle=none, crumbs=none, subtitle_mono=false, help_anchor=none, help_label=none) %}
+{# Der Help-Link hängt an der Subtitle, fällt ohne Subtitle aber auf den Titel
+   zurück - sonst wäre help_anchor auf solchen Seiten ein stiller No-Op. #}
+{% set help_markup = help_link(help_anchor, help_label or "Open help") if help_anchor else "" %}
+<div class="page-header">
+  <div class="page-heading">
+    {% if crumbs %}
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        {% for crumb in crumbs %}
+        <li>
+          {% if crumb.href %}
+          <a href="{{ crumb.href }}">{{ crumb.label }}</a>
+          {% else %}
+          <span aria-current="page">{{ crumb.label }}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+    </nav>
+    {% endif %}
+    <h1 class="page-title">{{ title }}{% if not subtitle %}{{ help_markup }}{% endif %}</h1>
+    {% if subtitle %}
+    <p class="page-subtitle{{ ' font-mono' if subtitle_mono }}">
+      {{ subtitle }}
+      {{ help_markup }}
+    </p>
+    {% endif %}
+  </div>
+  {% if caller is defined %}
+  <div class="page-actions">
+    {{ caller() }}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro run_buttons(job_name, step_name) %}
+<div class="run-status flex items-center gap-2">
+  <button hx-post="/jobs/{{ job_name }}/{{ step_name }}/run"
+          hx-target="closest .run-status"
+          hx-swap="outerHTML"
+          class="btn btn-primary btn-sm">
+    &#9654; Start
+  </button>
+  <button hx-post="/jobs/{{ job_name }}/{{ step_name }}/dry-run"
+          hx-target="closest .run-status"
+          hx-swap="outerHTML"
+          class="btn btn-warning btn-sm">
+    &#9655; Dry Run
+  </button>
+</div>
+{% endmacro %}
+
+{% macro badge_tone_class(tone) -%}
+{%- if tone in ['green', 'success', 'ok'] -%}badge-success
+{%- elif tone in ['red', 'danger', 'error'] -%}badge-danger
+{%- elif tone in ['amber', 'warning'] -%}badge-warning
+{%- elif tone in ['blue', 'info'] -%}badge-info
+{%- else -%}badge-neutral
+{%- endif -%}
+{%- endmacro %}
+
+{% macro status_badge(status, label, tone="slate", active=false) %}
+<span class="badge {{ badge_tone_class(tone) }}">
+  {% if status == "success" %}&#10003;
+  {% elif status in ["failed", "config_error", "unexpected_error"] %}&#10007;
+  {% elif status == "lock_error" %}&#9888;
+  {% elif status == "cancelled" %}&#9632;
+  {% elif status in ["queued", "runtime_stopping"] %}&#9203;
+  {% elif status == "running" or active %}&#9654;
+  {% else %}&#8722;{% endif %}
+  <span class="ml-1">{{ label | default("Unknown status", true) }}</span>
+</span>
+{% endmacro %}
+
+{% macro run_task(run, link_url=none, compact=false) %}
+{% if link_url %}<a href="{{ link_url }}" class="run-target-link{% if compact %} run-target-compact{% endif %}">{% else %}<div class="run-target-summary{% if compact %} run-target-compact{% endif %}">{% endif %}
+  <span class="run-target-text">
+    <span class="run-target-name">{{ run.target_primary or run.task_name or run.task_label or "Task" }}</span>
+    {% if run.target_secondary %}
+    <span class="run-target-meta">{{ run.target_secondary or run.task_type_label or "Task" }}</span>
+    {% endif %}
+  </span>
+  <span class="run-target-badges">
+    <span class="badge {{ badge_tone_class(run.task_type_tone) }}">
+      {{ run.task_type_label | default("Task", true) }}
+    </span>
+    {% if run.dry_run %}
+    <span class="badge badge-warning">Dry run</span>
+    {% endif %}
+  </span>
+{% if link_url %}</a>{% else %}</div>{% endif %}
+{% endmacro %}
+
+{% macro restore_selection_summary(obj, extra_class="") %}
+<pre class="restore-selection-summary font-mono text-xs whitespace-pre-wrap text-slate-800 dark:text-slate-200{% if extra_class %} {{ extra_class }}{% endif %}">{% if obj.mode == "browser" %}{{ obj.snapshot_paths | join("\n") }}{% elif obj.include_patterns %}Include:
+{{ obj.include_patterns | join("\n") }}{% elif obj.exclude_patterns %}Exclude:
+{{ obj.exclude_patterns | join("\n") }}{% else %}Whole snapshot{% endif %}</pre>
+{% endmacro %}
+
+{% macro alert_error(msg) %}
+{% if msg %}
+<div class="alert alert-danger mb-5 flex gap-3 whitespace-pre-wrap">
+  <svg class="w-4 h-4 text-red-400 dark:text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+  </svg>
+  <div><strong>Error:</strong> {{ msg }}</div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro alert_warning(messages) %}
+{% if messages %}
+<div class="alert alert-warning mb-5 flex gap-3">
+  <svg class="w-4 h-4 text-amber-500 dark:text-amber-300 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.59c.75 1.334-.213 2.985-1.742 2.985H3.48c-1.53 0-2.492-1.65-1.743-2.984l6.52-11.591zM11 14a1 1 0 10-2 0 1 1 0 002 0zm-1-2a1 1 0 01-1-1V8a1 1 0 112 0v3a1 1 0 01-1 1z" clip-rule="evenodd"/>
+  </svg>
+  <div>
+    <strong>Note:</strong>
+    {% if messages is string %}
+      {{ messages }}
+    {% else %}
+      <ul class="list-disc ml-4">
+      {% for message in messages %}
+        <li>{{ message }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro alert_success(msg, dismissible=false) %}
+{% if msg %}
+<div class="alert alert-success mb-5 flex gap-3">
+  <svg class="w-4 h-4 text-green-500 dark:text-green-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+  </svg>
+  <span class="flex-1">{{ msg }}</span>
+  {% if dismissible %}
+  <button type="button"
+          class="alert-dismiss"
+          aria-label="Dismiss"
+          onclick="this.closest('.alert').remove()">
+    &times;
+  </button>
+  {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro alert_config_error(msg, link_url=none, link_label=none) %}
+{% if msg %}
+<div class="alert alert-danger mb-6 flex gap-3">
+  <svg class="w-4 h-4 text-red-400 dark:text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+  </svg>
+  <div>
+    <strong>Config error:</strong> {{ msg }}
+    {% if link_url %}<a href="{{ link_url }}" class="ml-2 underline">{{ link_label }}</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}

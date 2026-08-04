@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "_macros.html" import alert_config_error, help_link %}
+{% block title %}Repositories - Dockkeep{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Repositories</h1>
+    <p class="page-subtitle">
+      Repository locations discovered from the AppData cache.
+      {{ help_link("repositories", "Help: repositories and refresh") }}
+    </p>
+  </div>
+  <div class="page-actions">
+    <form method="post"
+          action="/repositories/refresh"
+          hx-post="/repositories/refresh"
+          hx-swap="none"
+          hx-disabled-elt="find button"
+          hx-on::after-request="window.location.reload()">
+      <button type="submit"
+        class="btn btn-secondary btn-sm">
+        <span class="htmx-hide-on-request">Refresh</span>
+        <span class="htmx-indicator">Refreshing...</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+{{ alert_config_error(config_error, "/config", "Edit config") }}
+
+{% if repositories %}
+<div class="grid gap-4">
+  {% for repository in repositories %}
+  <section class="panel list-panel">
+    <div class="repository-summary">
+      <h2 class="repository-summary-title" title="{{ repository.title }}">{{ repository.title }}</h2>
+      <span class="repository-summary-count">
+        {{ repository.locations | length }} location{% if repository.locations | length != 1 %}s{% endif %}
+      </span>
+    </div>
+    {% if repository.locations %}
+    <div class="list-scroll">
+      <table class="data-table list-table">
+        <thead>
+          <tr>
+            <th>Used by</th>
+            <th>Location</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for location in repository.locations %}
+          <tr>
+            <td>
+              {% if location.config_refs %}
+              <div class="repository-config-list">
+                {% for ref in location.config_refs %}
+                <span class="badge badge-success">{{ ref.job }}: {{ ref.backup }}</span>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span class="badge badge-neutral">{{ location.label }}</span>
+              {% endif %}
+            </td>
+            <td class="list-cell-mono break-all">
+              <a href="{{ location.view_url }}" class="text-link">{{ location.display_repository }}</a>
+            </td>
+            <td class="text-right">
+              <div class="list-actions">
+                <a href="{{ location.view_url }}" class="btn btn-secondary btn-sm">Snapshots</a>
+                {% if not location.is_active %}
+                <button type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-open-dialog="merge-location-dialog-{{ location.location_id }}">
+                  Merge
+                </button>
+                {% endif %}
+                <form method="post"
+                      action="{{ location.delete_url }}"
+                      hx-post="{{ location.delete_url }}"
+                      hx-swap="none"
+                      hx-disabled-elt="find button"
+                      hx-confirm="Really delete location '{{ location.display_repository }}'?"
+                      hx-on::after-request="window.location.reload()">
+                  <input type="hidden" name="repository_id" value="{{ location.repository_id }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">No locations stored.</div>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% for repository in repositories %}
+  {% for location in repository.locations %}
+    {% if not location.is_active %}
+<dialog id="merge-location-dialog-{{ location.location_id }}" class="modal-dialog modal-dialog-wide">
+  <form method="post" action="{{ location.merge_url }}"
+        class="modal-card"
+        hx-post="{{ location.merge_url }}"
+        hx-swap="none"
+        hx-disabled-elt="find button"
+        hx-on::after-request="window.location.reload()">
+    <div class="modal-header">
+      <h2 class="modal-title">Merge repository location</h2>
+      <button type="button"
+              class="modal-close"
+              data-close-dialog="merge-location-dialog-{{ location.location_id }}"
+              aria-label="Close">
+        &times;
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="merge-info">
+        <span class="info-icon" aria-hidden="true">&#9432;</span>
+        Moves all artifacts and statistics from this location to the selected target location.
+        This location will be removed afterwards. This cannot be undone.
+      </p>
+      <div>
+        <label class="form-label" for="merge-target-{{ location.location_id }}">Target location</label>
+        <select id="merge-target-{{ location.location_id }}"
+                name="target_location_id"
+                class="form-control"
+                required
+                autofocus>
+          {% for target in location.merge_targets %}
+          <option value="{{ target.location_id }}">{{ target.display_repository }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <input type="hidden" name="repository_id" value="{{ location.repository_id }}">
+    </div>
+    <div class="modal-actions">
+      <button type="button"
+              class="btn btn-secondary"
+              data-close-dialog="merge-location-dialog-{{ location.location_id }}">
+        Cancel
+      </button>
+      <button type="submit" class="btn btn-danger">Merge location</button>
+    </div>
+  </form>
+</dialog>
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+{% elif not config_error %}
+<div class="empty-state">
+  <p class="text-sm mb-2">No repository data has been cached yet.</p>
+  <p class="text-xs mb-4">Run a backup or refresh the cache after configuring a backup job.</p>
+  <div class="form-actions justify-center">
+    <form method="post"
+          action="/repositories/refresh"
+          hx-post="/repositories/refresh"
+          hx-swap="none"
+          hx-disabled-elt="find button"
+          hx-on::after-request="window.location.reload()">
+      <button type="submit" class="btn btn-secondary btn-sm">
+        <span class="htmx-hide-on-request">Refresh repositories</span>
+        <span class="htmx-indicator">Refreshing...</span>
+      </button>
+    </form>
+    <a href="/config/jobs" class="btn btn-secondary btn-sm">Configure jobs</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,109 @@
+# Dockkeep - valid target-model fixture.
+
+[global]
+log_level = "debug"
+log_retention_days = 30
+hook_timeout = 300
+notify_on_success = false
+notify_on_error = true
+notify_on_skipped = true
+
+[global.backup]
+password_env = "RESTIC_PASSWORD"
+backup_timeout = 7200
+retention = false
+cleanup = false
+auto_init = false
+keep_daily = 7
+keep_weekly = 4
+exclude = ["*.tmp"]
+exclude_files = ["/config/excludes/global.txt"]
+exclude_caches = true
+one_file_system = false
+extra_restic_backup_args = ["--verbose"]
+extra_restic_forget_args = ["--keep-tag global"]
+extra_restic_prune_args = ["--max-unused 5%"]
+
+[global.rclone]
+rclone_timeout = 3600
+transfers = 4
+checkers = 8
+bwlimit = "10M"
+extra_rclone_args = ["--fast-list"]
+
+[global.notifications.mail]
+host = "smtp.example.com"
+port = 587
+connection_security = "starttls"
+from_addr = "backup@example.com"
+to = ["admin@example.com", "ops@example.com"]
+
+[jobs.myjob]
+notify_on_success = true
+
+[jobs.myjob.backup]
+retention = false
+cleanup = false
+auto_init = false
+keep_daily = 7
+keep_weekly = 4
+exclude = ["*.tmp", ".DS_Store"]
+exclude_files = ["/config/excludes/job.txt"]
+exclude_caches = true
+one_file_system = false
+extra_restic_backup_args = ["--host myjob"]
+extra_restic_forget_args = ["--keep-tag myjob"]
+extra_restic_prune_args = ["--max-unused 10%"]
+
+[jobs.myjob.rclone]
+transfers = 8
+checkers = 16
+bwlimit = "20M"
+extra_rclone_args = ["--drive-chunk-size 64M"]
+
+[jobs.myjob.backup.local]
+repository = "/backups/myjob"
+schedule = "0 2 * * *"
+sources = ["/data/docs", "/data/photos"]
+source_files = ["/config/srcs.txt"]
+retention = true
+cleanup = true
+auto_init = false
+exclude = ["*.tmp", ".DS_Store"]
+exclude_files = ["/config/excludes.txt"]
+tags = ["myjob"]
+keep_daily = 7
+keep_weekly = 4
+notify_on_success = false
+extra_restic_backup_args = ["--tag local", "--tag \"Server Backup\""]
+extra_restic_forget_args = ["--keep-tag manual"]
+extra_restic_prune_args = ["--max-unused 5%"]
+
+[jobs.myjob.backup.remote]
+repository = "rclone:myrclone:bucket/myjob"
+sources = ["/data/docs", "/data/photos"]
+retention = true
+cleanup = false
+auto_init = false
+keep_daily = 7
+keep_weekly = 4
+extra_restic_backup_args = []
+extra_restic_forget_args = []
+extra_restic_prune_args = []
+
+[jobs.myjob.rclone.offsite]
+source = "/backups/myjob"
+target = "myrclone:bucket/myjob"
+sync_delete = false
+exclude = ["*.lock"]
+filter_from = "/config/rclone-filter.txt"
+extra_rclone_args = []
+schedule = "0 3 * * *"
+
+[jobs.myjob.workflow.nightly]
+schedule = "0 2 * * *"
+steps = ["backup.local", "backup.remote", "rclone.offsite"]
+notify_on_success = true
+
+[jobs.myjob.workflow.snapshot]
+steps = ["backup.local.backup"]

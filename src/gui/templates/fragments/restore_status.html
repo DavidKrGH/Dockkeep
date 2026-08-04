@@ -1,0 +1,33 @@
+<div
+  class="restore-status"
+  {% if restore.is_active %}
+    hx-get="{{ restore.status_url }}"
+    hx-trigger="every 3s [document.visibilityState=='visible']"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  <div class="flex items-center gap-2">
+    {% include "fragments/restore_status_badge.html" %}
+    <a href="{{ restore.detail_url }}" class="text-link-muted text-xs">Details</a>
+    {% if restore.is_active and restore.is_cancellable and restore.cancel_url %}
+      <button
+        hx-post="{{ restore.cancel_url }}"
+        hx-target="closest .restore-status"
+        hx-swap="outerHTML"
+        class="btn btn-danger btn-sm">
+        Cancel
+      </button>
+    {% endif %}
+  </div>
+  {% if restore.error %}
+    <div class="alert alert-danger mt-3 whitespace-pre-wrap">
+      {{ restore.error }}
+    </div>
+  {% endif %}
+  {% if restore.output %}
+    <pre class="mt-3 font-mono text-xs whitespace-pre-wrap text-slate-100 bg-slate-900 dark:bg-black rounded-md p-4 overflow-y-auto restore-output">{{ restore.output }}</pre>
+    {% if restore.output_truncated %}
+      <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Output truncated.</p>
+    {% endif %}
+  {% endif %}
+</div>

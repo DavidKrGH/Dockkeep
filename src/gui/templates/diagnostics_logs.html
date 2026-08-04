@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "_diagnostics_tabs.html" import diagnostics_tabs %}
+{% from "_macros.html" import help_link %}
+{% block title %}Diagnostics: Logs - Dockkeep{% endblock %}
+
+{% block content %}
+{{ diagnostics_tabs("logs") }}
+
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Logs</h1>
+    <p class="page-subtitle">
+      Search, filter, and follow job logs live.
+      {{ help_link("logs", "Help: logs and line format") }}
+    </p>
+  </div>
+  {% if selected_job %}
+  <div class="page-actions">
+    <button data-log-action="start-live"
+            class="btn btn-primary btn-sm">
+      &#9654; Live
+    </button>
+    <button data-log-action="stop-live"
+            class="btn btn-secondary btn-sm">
+      &#9646;&#9646; Stop
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<form method="GET" action="/diagnostics/logs"
+      class="toolbar mb-5">
+  <div class="flex flex-wrap gap-3 items-center">
+  <div class="flex items-center gap-2">
+    <label class="form-label" for="log-job">Job:</label>
+    <select name="job" data-auto-submit
+            id="log-job"
+            class="form-control">
+      {% for name in job_names %}
+      <option value="{{ name }}" {% if name == selected_job %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if available_dates %}
+  <div class="flex items-center gap-2">
+    <label class="form-label" for="log-date">Date:</label>
+    <select name="date" data-auto-submit
+            id="log-date"
+            class="form-control">
+      {% for date in available_dates %}
+      <option value="{{ date }}" {% if date == selected_date %}selected{% endif %}>{{ date }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  </div>
+</form>
+
+{% if log_error %}
+<div class="alert alert-danger mb-4">
+  {{ log_error }}
+</div>
+{% endif %}
+
+<div class="toolbar justify-start mb-4">
+  <div class="flex gap-2 items-center log-level-group">
+    <span class="form-label mr-1">Level:</span>
+    {% for level in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] %}
+    <button id="lvl-btn-{{ level }}"
+            data-log-level="{{ level }}"
+            type="button"
+            class="log-level-toggle">
+      {{ level }}
+    </button>
+    {% endfor %}
+  </div>
+  <div class="flex gap-2 items-center log-search-group">
+    <label class="form-label" for="log-task-filter">Task:</label>
+    <input id="log-task-filter"
+           data-log-task-filter
+           type="search"
+           class="form-control log-search-input"
+           autocomplete="off"
+           placeholder="backup.local">
+    <button data-log-task-filter-clear
+            type="button"
+            class="btn btn-secondary btn-sm">
+      Clear
+    </button>
+  </div>
+  <div class="flex gap-2 items-center log-search-group">
+    <label class="form-label" for="log-search">Search:</label>
+    <input id="log-search"
+           data-log-search
+           type="search"
+           class="form-control log-search-input"
+           autocomplete="off"
+           placeholder="Search text">
+    <button data-log-search-clear
+            type="button"
+            class="btn btn-secondary btn-sm">
+      Clear
+    </button>
+  </div>
+</div>
+
+<div id="live-container" class="hidden mb-4">
+  <div class="flex items-center justify-between px-4 py-2.5 bg-slate-800 dark:bg-slate-900 rounded-t-xl">
+    <span class="badge badge-success">&#9679; LIVE — {{ selected_job }}</span>
+    <span id="live-status" class="text-xs text-slate-400">Connecting…</span>
+  </div>
+  <pre id="live-output"
+       class="font-mono text-xs bg-slate-900 dark:bg-black text-slate-100 p-4 rounded-b-xl
+              overflow-y-auto whitespace-pre-wrap log-output-live"></pre>
+</div>
+
+<div id="static-container">
+  {% if log_content is not none %}
+  <div class="bg-slate-900 dark:bg-black rounded-xl overflow-hidden">
+    <div class="px-4 py-2.5 bg-slate-800 dark:bg-slate-900 text-xs text-slate-400 font-mono flex items-center justify-between">
+      <span>{{ selected_job }} / {{ selected_date }}.log</span>
+      {% if log_truncated %}
+      <span class="text-amber-400">last {{ log_tail }} lines — <a href="/diagnostics/logs/{{ selected_job }}/raw?date={{ selected_date }}"
+            class="underline hover:text-amber-300" target="_blank">open full log</a></span>
+      {% endif %}
+    </div>
+    <pre id="static-pre"
+         class="font-mono text-xs text-slate-100 p-4 overflow-y-auto whitespace-pre-wrap log-output-static"></pre>
+  </div>
+  {% elif selected_job %}
+  <div class="empty-state">
+    No log file for {{ selected_job }} / {{ selected_date }}.
+  </div>
+  {% else %}
+  <div class="empty-state">
+    No job selected or no logs available yet.
+  </div>
+  {% endif %}
+</div>
+
+<script id="log-viewer-data" type="application/json">
+  {{ {"job": selected_job | default(""), "date": selected_date | default(""), "content": log_content} | tojson }}
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/logs.js') }}?v={{ asset_version }}" defer></script>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% macro diagnostics_tabs(active) %}
+<nav class="config-tabs" aria-label="Diagnostics sections">
+  <a href="/diagnostics/logs"
+     class="config-tab {{ 'config-tab-active' if active == 'logs' else '' }}"
+     {% if active == 'logs' %}aria-current="page"{% endif %}>
+    Logs
+  </a>
+  <a href="/diagnostics/database"
+     class="config-tab {{ 'config-tab-active' if active == 'database' else '' }}"
+     {% if active == 'database' %}aria-current="page"{% endif %}>
+    Database
+  </a>
+</nav>
+{% endmacro %}

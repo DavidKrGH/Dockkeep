@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macros.html" import help_link %}
+{% block title %}Runs — Dockkeep{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Runs</h1>
+    <p class="page-subtitle">
+      {{ active_count }} active, {{ history_count }} in history
+      {{ help_link("runs", "Help: runs and run status") }}
+    </p>
+  </div>
+</div>
+
+{% include "fragments/runs_active.html" %}
+{% include "fragments/runs_history.html" %}
+{% endblock %}

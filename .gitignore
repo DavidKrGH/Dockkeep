@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Build / Distribution
+*.egg-info/
+dist/
+build/
+*.egg
+MANIFEST
+
+# Testing & Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Laufzeit-Verzeichnisse (lokal via Env konfigurierbar)
+data/logs/
+data/backups/
+data/appdata/
+data/restore/
+data/var_lock/
+data/scripts/
+
+# Lock-Dateien (Laufzeit)
+*.lock
+
+# Secrets & Umgebungsvariablen
+.env
+.env.*
+!.env.example
+
+# Echte Konfigurationen (nur Templates/Examples tracken)
+data/config/config.toml
+data/config/rclone.conf
+config/settings.json
+
+# Lokale Docker-Overrides
+docker-compose.override.yml
+
+# Linter / Tool Caches
+.ruff_cache
+.mypy_cache/
+
+# Lokale Agenten-/Assistenzdaten
+skills
+.claude/
+.codex/
+.agents/
+AGENTS.md
+CLAUDE.md
+docs/audit-findings.md
+docs/deep-bug-audit-plan.md
+docs/refactor-audit-plan.md
+docs/local_docs/
+!docs/screenshots/
+
+# Restic / Rclone Cache
+*.cache
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

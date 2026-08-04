@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% from "_config_editor_nav.html" import job_sidebar %}
+{% from "_macros.html" import page_header %}
+{% block title %}Effective config: {{ view.job_name }} — Dockkeep{% endblock %}
+
+{% macro source_badge(field) %}
+{%- if field.source == 'global' -%}
+<span class="effective-source effective-source-global">global</span>
+{%- elif field.source == 'job' -%}
+<span class="effective-source effective-source-job">job</span>
+{%- elif field.source == 'default' -%}
+<span class="effective-source effective-source-default">default</span>
+{%- endif -%}
+{% endmacro %}
+
+{% macro field_value(field) %}
+{% if field.list_items %}
+<ul class="effective-value-list">
+  {% for item in field.list_items %}
+  <li>{{ item }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+{{ field.value }}
+{% endif %}
+{% if field.note %}<span class="effective-field-note">{{ field.note }}</span>{% endif %}
+{% endmacro %}
+
+{% macro effective_fields(fields) %}
+<dl class="effective-fields">
+  {% for field in fields %}
+  <div class="effective-field{% if field.list_items %} effective-field-list{% endif %}">
+    <dt>{{ field.label }}{{ source_badge(field) }}</dt>
+    <dd>{{ field_value(field) }}</dd>
+  </div>
+  {% endfor %}
+</dl>
+{% endmacro %}
+
+{% macro effective_meta_bar(fields) %}
+<div class="effective-meta-bar">
+  {% for field in fields %}
+  <div class="effective-meta-item{% if field.kind == 'path' %} effective-meta-item-wide{% endif %}">
+    <span class="effective-meta-label">{{ field.label }}</span>
+    <span class="effective-meta-value{% if field.kind == 'path' %} font-mono{% endif %}">{{ field.value }}</span>
+    {% if field.note %}<span class="effective-field-note">{{ field.note }}</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro effective_card(group, extra_class="") %}
+<section class="panel-soft p-4 effective-group-card{% if extra_class %} {{ extra_class }}{% endif %}">
+  <h3 class="effective-group-title">{{ group.label }}</h3>
+  {{ effective_fields(group.fields) }}
+</section>
+{% endmacro %}
+
+{% macro effective_detail_group(title, groups, open=false) %}
+{% if groups %}
+<details class="effective-detail-group" {% if open %}open{% endif %}>
+  <summary class="effective-detail-summary">
+    <span>{{ title }}</span>
+    <svg class="w-4 h-4 chevron transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+    </svg>
+  </summary>
+  <div class="effective-groups effective-detail-grid">
+    {% for group in groups %}
+      {{ effective_card(group) }}
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+{% endmacro %}
+
+{% macro task_section(kind_label, anchor, task, edit_href) %}
+<section class="panel" id="{{ anchor }}">
+  <div class="panel-header">
+    <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">
+      {{ kind_label }}: <span class="font-mono">{{ task.name }}</span>
+    </h2>
+    <a href="{{ edit_href }}" class="btn btn-secondary btn-sm">Edit</a>
+  </div>
+  <div class="panel-body effective-task-body">
+    {% for warning in task.warnings %}
+    <div class="alert alert-warning">{{ warning }}</div>
+    {% endfor %}
+    {{ effective_meta_bar(task.summary_fields) }}
+    {% if task.main_group %}
+      {{ effective_card(task.main_group, "effective-input-card") }}
+    {% endif %}
+    {% if task.steps %}
+    <section class="panel-soft p-4 effective-group-card effective-input-card">
+      <h3 class="effective-group-title">Steps</h3>
+      <ol class="effective-steps">
+        {% for step in task.steps %}
+        <li><a href="#{{ step.kind }}-{{ step.target }}" class="text-link font-mono">{{ step.label }}</a></li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+    {{ effective_detail_group("Details", task.groups) }}
+  </div>
+</section>
+{% endmacro %}
+
+{% block content %}
+{{ config_tabs("jobs") }}
+{{ page_header(
+  "Effective config: " ~ view.job_name,
+  "Final values after applying global → job → task inheritance. Read-only — use the edit forms to change them.",
+  [
+    {"label": "Configuration", "href": "/config/jobs"},
+    {"label": view.job_name}
+  ],
+  help_anchor="inheritance",
+  help_label="Help: how settings inherit"
+) }}
+<div class="config-layout">
+  {{ job_sidebar(job_nav, job_nav_active, job_nav_resource, job_nav_jobs) }}
+  <div class="config-main grid gap-5">
+    {% if view.job_groups %}
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">Job level</h2>
+      </div>
+      <div class="panel-body effective-task-body">
+        <p class="effective-job-note">
+          Values set at job level. Backups, Rclone tasks, and workflows inherit them
+          unless they override them; the effective result is shown per task below.
+        </p>
+        {{ effective_detail_group("Hooks, notifications & timeouts", view.job_groups) }}
+      </div>
+    </section>
+    {% endif %}
+
+    {% for backup in view.backups %}
+      {{ task_section("Backup", "backup-" ~ backup.name, backup,
+                      "/config/jobs/" ~ view.job_name ~ "/backups/" ~ backup.name) }}
+    {% endfor %}
+
+    {% for task in view.rclone_tasks %}
+      {{ task_section("Rclone task", "rclone-" ~ task.name, task,
+                      "/config/jobs/" ~ view.job_name ~ "/rclone/" ~ task.name) }}
+    {% endfor %}
+
+    {% for workflow in view.workflows %}
+      {{ task_section("Workflow", "workflow-" ~ workflow.name, workflow,
+                      "/config/jobs/" ~ view.job_name ~ "/workflows/" ~ workflow.name) }}
+    {% endfor %}
+
+    {% if not view.backups and not view.workflows and not view.rclone_tasks %}
+    <div class="empty-state">
+      <p class="text-sm">This job has no backups, workflows, or Rclone tasks yet.</p>
+      <a href="/config/jobs/{{ view.job_name }}/backups/new" class="btn btn-primary mt-4">
+        Create first backup
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

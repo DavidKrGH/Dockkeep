@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block title %}Repositories - Snapshots - Dockkeep{% endblock %}
+
+{% block head %}
+{% if growth_data and growth_data.has_data %}
+<script src="{{ url_for('static', path='/js/charts/chart.min.js') }}?v={{ asset_version }}" defer></script>
+<script src="{{ url_for('static', path='/js/repository-snapshots-chart.js') }}?v={{ asset_version }}" defer></script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% call page_header(
+  "Snapshots",
+  repository,
+  [
+    {"label": "Repositories", "href": "/repositories"},
+    {"label": label}
+  ],
+  subtitle_mono=true
+) %}
+  {% if is_active %}
+  <span class="badge badge-success">{{ label }}</span>
+  {% else %}
+  <span class="badge badge-neutral">{{ label }}</span>
+  {% endif %}
+  {% if refresh_url %}
+  <form method="post"
+        action="{{ refresh_url }}"
+        hx-post="{{ refresh_url }}"
+        hx-swap="none"
+        hx-disabled-elt="find button"
+        hx-on::after-request="window.location.reload()">
+    <button type="submit"
+      class="btn btn-secondary btn-sm">
+      <span class="htmx-hide-on-request">Refresh</span>
+      <span class="htmx-indicator">Refreshing...</span>
+    </button>
+  </form>
+  {% endif %}
+{% endcall %}
+
+{% if growth_data and growth_data.has_data %}
+<div class="mb-6 panel panel-body">
+  <h2 class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-4">New data stored (cumulative)</h2>
+  <div class="relative h-44">
+    <canvas id="chart-backup-growth"></canvas>
+  </div>
+</div>
+{% endif %}
+
+{% if snapshots %}
+<div class="panel list-panel">
+  <div class="panel-header list-header">
+    <span class="list-title">
+      {{ snapshots | length }} Snapshot{% if snapshots | length != 1 %}s{% endif %}
+    </span>
+  </div>
+  <div class="list-scroll">
+    <table class="data-table list-table snapshot-list-table">
+      <colgroup>
+        <col class="snapshot-col-id">
+        <col class="snapshot-col-time">
+        <col class="snapshot-col-host">
+        <col class="snapshot-col-sources">
+        <col class="snapshot-col-data">
+        <col class="snapshot-col-duration">
+        <col class="snapshot-col-new">
+        <col class="snapshot-col-changed">
+        <col class="snapshot-col-tags">
+        <col class="snapshot-col-actions">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Time</th>
+          <th>Host</th>
+          <th>Sources</th>
+          <th class="text-right">Data processed</th>
+          <th class="text-right">Duration</th>
+          <th class="text-right">New</th>
+          <th class="text-right">Changed</th>
+          <th>Tags</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for snap in snapshots | sort(attribute='time', reverse=True) %}
+        <tr>
+          <td class="list-cell-mono">
+            <a href="{{ snap.detail_url }}" class="text-link">{{ snap.short_id }}</a>
+          </td>
+          <td class="list-cell-time">
+            {{ snap.time | format_datetime }}
+          </td>
+          <td class="snapshot-host-cell">{{ snap.hostname or "–" }}</td>
+          <td>
+            {% set _paths = snap.paths if snap.paths else [] %}
+            <button type="button"
+                    class="snapshot-paths-toggle"
+                    data-snapshot-path-toggle
+                    aria-expanded="false"
+                    aria-controls="snapshot-paths-{{ snap.short_id }}-{{ loop.index }}">
+              <span class="snapshot-paths-caret" aria-hidden="true">›</span>
+              <span>{{ _paths | length }} path{% if _paths | length != 1 %}s{% endif %}</span>
+            </button>
+          </td>
+          <td class="list-cell-number">
+            {% set _size = snap.summary.get('total_bytes_processed') if snap.summary else none %}
+            {% if _size is not none %}{{ _size | format_bytes }}{% else %}–{% endif %}
+          </td>
+          <td class="list-cell-number">
+            {% set _dur = snap.summary.get('total_duration') if snap.summary else none %}
+            {% if _dur is not none %}
+              {% set ds = _dur | int %}
+              {% if ds >= 3600 %}{{ (ds // 3600) }}h {{ ((ds % 3600) // 60) }}m
+              {% elif ds >= 60 %}{{ ds // 60 }}m {{ ds % 60 }}s
+              {% else %}{{ ds }}s{% endif %}
+            {% else %}–{% endif %}
+          </td>
+          <td class="list-cell-number">
+            {% set _new = snap.summary.get('files_new') if snap.summary else none %}
+            {% set _total = snap.summary.get('total_files_processed') if snap.summary else none %}
+            {% if _new is not none %}
+              <span class="text-green-700 dark:text-green-400 font-medium">{{ _new }}</span>
+              {% if _total and _total > 0 %}
+                <span class="text-slate-400 dark:text-slate-500 ml-0.5">({{ "%.1f"|format(_new / _total * 100) }}%)</span>
+              {% endif %}
+            {% else %}–{% endif %}
+          </td>
+          <td class="list-cell-number">
+            {% set _changed = snap.summary.get('files_changed') if snap.summary else none %}
+            {% set _total = snap.summary.get('total_files_processed') if snap.summary else none %}
+            {% if _changed is not none %}
+              <span class="text-amber-600 dark:text-amber-400 font-medium">{{ _changed }}</span>
+              {% if _total and _total > 0 %}
+                <span class="text-slate-400 dark:text-slate-500 ml-0.5">({{ "%.1f"|format(_changed / _total * 100) }}%)</span>
+              {% endif %}
+            {% else %}–{% endif %}
+          </td>
+          <td class="snapshot-tags-cell">
+            {% if snap.tags %}
+              {% for tag in snap.tags %}
+              <span class="badge badge-neutral mr-1">{{ tag }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="text-slate-400 dark:text-slate-500">–</span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            <div class="list-actions">
+              <a href="{{ snap.detail_url }}"
+                 class="btn btn-secondary btn-sm">
+                Browse
+              </a>
+              <a href="{{ snap.restore_url }}"
+                 class="btn btn-secondary btn-sm">
+                Restore
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr id="snapshot-paths-{{ snap.short_id }}-{{ loop.index }}"
+            class="snapshot-paths-row"
+            hidden>
+          <td colspan="10">
+            <div class="snapshot-paths-panel">
+              {% if _paths %}
+              <ul>
+                {% for path in _paths %}
+                <li>{{ path }}</li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p>No paths stored.</p>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% elif cache_empty %}
+<div class="empty-state">
+  <p class="text-sm mb-2">No snapshot data has been cached for this location yet.</p>
+  <p class="text-xs mb-4">Run a backup for this repository, then refresh this location if it does not appear here.</p>
+  <div class="form-actions justify-center">
+    {% if refresh_url %}
+    <form method="post"
+          action="{{ refresh_url }}"
+          hx-post="{{ refresh_url }}"
+          hx-swap="none"
+          hx-disabled-elt="find button"
+          hx-on::after-request="window.location.reload()">
+      <button type="submit" class="btn btn-secondary btn-sm">
+        <span class="htmx-hide-on-request">Refresh location</span>
+        <span class="htmx-indicator">Refreshing...</span>
+      </button>
+    </form>
+    {% endif %}
+    <a href="/" class="btn btn-secondary btn-sm">Open dashboard</a>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <p class="text-sm mb-2">No snapshots are present for this location.</p>
+  <p class="text-xs mb-4">The cache is available, but it does not currently contain any snapshot artifacts.</p>
+  <div class="form-actions justify-center">
+    {% if refresh_url %}
+    <form method="post"
+          action="{{ refresh_url }}"
+          hx-post="{{ refresh_url }}"
+          hx-swap="none"
+          hx-disabled-elt="find button"
+          hx-on::after-request="window.location.reload()">
+      <button type="submit" class="btn btn-secondary btn-sm">
+        <span class="htmx-hide-on-request">Refresh location</span>
+        <span class="htmx-indicator">Refreshing...</span>
+      </button>
+    </form>
+    {% endif %}
+    <a href="/" class="btn btn-secondary btn-sm">Open dashboard</a>
+  </div>
+</div>
+{% endif %}
+{% if growth_data and growth_data.has_data %}
+<script id="repository-growth-data" type="application/json">{{ growth_data | tojson }}</script>
+{% endif %}
+{% endblock %}

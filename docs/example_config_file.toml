@@ -1,0 +1,332 @@
+# Complete example config showing the intended raw TOML structure.
+#
+# Inheritance chains:
+#   [global.backup]  -> [jobs.<name>.backup]  -> [jobs.<name>.backup.<name>]
+#   [global.rclone]  -> [jobs.<name>.rclone]  -> [jobs.<name>.rclone.<task>]
+#   [global]         -> [jobs.<name>]          -> [jobs.<name>.backup.<name>] / [jobs.<name>.rclone.<task>] / [jobs.<name>.workflow.<name>]
+#                                                 (cross-cutting: hook_timeout, notify_on_*)
+#
+# Hooks are not inherited:
+#   [jobs.<name>]                                 = hooks for the entire job run
+#   [jobs.<name>.backup.<name>]                   = hooks for this backup task
+#   [jobs.<name>.rclone.<task>]                   = hooks for this Rclone task
+#   [jobs.<name>.workflow.<name>]                 = hooks for this workflow
+#
+# Only backend = "restic" is implemented. Backend selection is final at the
+# backup task level.
+#
+# Workflow step syntax:
+#   backup.<name>                  = full backup task, using its effective flags
+#   backup.<name>.backup           = backup/create subcommand only
+#   backup.<name>.retention        = retention/forget subcommand only
+#   backup.<name>.cleanup          = cleanup/prune/compact subcommand only
+#   rclone.<name>                  = Rclone task
+
+[global]
+log_level = "debug"  # debug | info | warning | error | critical
+log_retention_days = 30
+lock_retry_count = 3
+lock_retry_delay = 60
+hook_timeout = 300
+notify_on_success = false
+notify_on_error = false
+notify_on_skipped = false
+
+[global.backup]
+password_env = "BACKUP_PASSWORD"
+# password_file = "/config/passwords/password.txt"
+# password = "MyPassword"
+backup_timeout = 3600
+
+# Retention and cleanup policies can be defined as defaults, but they only take
+# effect when retention/cleanup is true on the effective task or when the
+# corresponding substep is run manually.
+retention = false
+cleanup = false
+auto_init = false
+keep_last = 10
+keep_hourly = 24
+keep_daily = 7
+keep_weekly = 4
+keep_monthly = 6
+keep_yearly = 1
+keep_within = "2m3d"
+keep_within_daily = "7d"
+exclude = ["*.tmp", "*.cache", ".DS_Store"]
+exclude_files = ["/config/excludes/global.txt", "/config/excludes/media.txt"]
+exclude_caches = true
+one_file_system = false
+extra_restic_backup_args = ["--verbose"]
+extra_restic_forget_args = ["--keep-tag global"]
+extra_restic_prune_args = ["--max-unused 5%"]
+
+# Borg is NOT implemented. The following section only illustrates how another
+# backend could be structured, so it remains commented out.
+# Currently, only backend = "restic" can be selected.
+# extra_borg_create_args = []
+# extra_borg_prune_args = []
+# extra_borg_compact_args = []
+
+[global.rclone]
+rclone_timeout = 7200
+transfers = 4
+checkers = 8
+bwlimit = "10M"
+sync_delete = false
+exclude = ["*.tmp", "*.partial"]
+filter_from = "/config/rclone-global-filter.txt"
+extra_rclone_args = ["--fast-list"]
+
+[global.notifications]
+report_schedule = "0 8 * * *"
+
+[global.notifications.mail]
+host = "smtp.example.com"
+port = 587
+connection_security = "starttls"
+username_env = "SMTP_USER"
+password_env = "SMTP_PASSWORD"
+from_addr = "backup@example.com"
+to = ["admin@example.com", "ops@example.com"]
+# Which event kinds this channel carries; omit for all of them.
+events = ["success", "error", "skipped", "report"]
+
+[global.notifications.pushover]
+token_env = "PUSHOVER_TOKEN"
+user_key_env = "PUSHOVER_USER_KEY"
+priority = 0
+sound = "pushover"
+device = "phone"
+# Push only for errors; success, skipped and reports stay with mail.
+events = ["error"]
+
+
+# ==============================================================================
+# Job: full_job
+# ==============================================================================
+#
+# [jobs.full_job]          - cross-cutting settings only (notify_on_*); not a catch-all section
+# [jobs.full_job.backup]   - backup defaults, mirrors [global.backup]
+# [jobs.full_job.rclone]   - Rclone defaults, mirrors [global.rclone]
+
+[jobs.full_job]
+hook_timeout = 600
+pre_hooks = ["/scripts/pre-job.sh"]
+post_hooks = ["/scripts/post-job.sh"]
+on_error_hooks = ["/scripts/on-error-job.sh"]
+notify_on_success = true
+notify_on_error = true
+notify_on_skipped = true
+
+[jobs.full_job.backup]
+exclude = ["*.tmp", "*.cache", ".DS_Store"]
+exclude_files = ["/config/excludes/global.txt", "/config/excludes/media.txt"]
+password_env = "BACKUP_PASSWORD_FULL_JOB"
+# password_file = "/config/passwords/password-full-job.txt"
+# password = "MyPassword_Job"
+backup_timeout = 5400
+retention = true
+cleanup = true
+auto_init = true
+exclude_caches = true
+one_file_system = true
+keep_last = 20
+keep_hourly = 48
+keep_daily = 14
+keep_weekly = 8
+keep_monthly = 12
+keep_yearly = 3
+keep_within = "6m"
+keep_within_daily = "1m"
+extra_restic_backup_args = ["--host full-job", "--tag inherited-from-job"]
+extra_restic_forget_args = ["--keep-tag full-job"]
+extra_restic_prune_args = ["--max-unused 10%"]
+
+# Borg illustration; not implemented and left commented out:
+# extra_borg_create_args = []
+# extra_borg_prune_args = []
+# extra_borg_compact_args = []
+
+[jobs.full_job.rclone]
+rclone_timeout = 9000
+transfers = 8
+checkers = 16
+bwlimit = "20M"
+sync_delete = false
+exclude = ["*.lock", "tmp/**"]
+filter_from = "/config/rclone-job-filter.txt"
+extra_rclone_args = ["--drive-chunk-size 64M"]
+
+
+# ------------------------------------------------------------------------------
+# Backup: full_job / local
+# ------------------------------------------------------------------------------
+
+[jobs.full_job.backup.local]
+backend = "restic"
+repository = "/backups/full_job/local"
+schedule = "0 2 * * *"
+
+# sources/source_files exist only at the backup task level. They are not
+# inherited, and there is no default in [global.backup]/[jobs.<job>.backup].
+sources = ["/data/projects", "/data/documents"]
+source_files = ["/config/sources/local-extra.txt"]
+tags = ["local", "full_job"]
+# exclude/exclude_files are inheritable. These lists fully replace the inherited
+# defaults via list override.
+exclude = ["*.tmp", "node_modules", ".venv"]
+exclude_files = ["/config/excludes/local.txt"]
+
+password_env = "BACKUP_PASSWORD_LOCAL"
+# password_file = "/config/passwords/password-local.txt"
+# password = "MyPassword_local"
+backup_timeout = 3600
+hook_timeout = 300
+retention = true
+cleanup = true
+auto_init = true
+exclude_caches = true
+one_file_system = false
+keep_last = 14
+keep_hourly = 24
+keep_daily = 10
+keep_weekly = 6
+keep_monthly = 12
+keep_yearly = 2
+keep_within = "3m"
+keep_within_weekly = "1y"
+extra_restic_backup_args = ["--tag local", "--tag \"Server Backup\""]
+extra_restic_forget_args = ["--keep-tag manual", "--group-by host"]
+extra_restic_prune_args = ["--max-unused 5%", "--max-repack-size 1G"]
+pre_hooks = ["/scripts/pre-local.sh"]
+post_hooks = ["/scripts/post-local.sh"]
+on_error_hooks = ["/scripts/on-error-local.sh"]
+notify_on_success = false
+notify_on_error = true
+notify_on_skipped = true
+
+# Borg illustration; not implemented and left commented out:
+# extra_borg_create_args = []
+# extra_borg_prune_args = []
+# extra_borg_compact_args = []
+
+
+# ------------------------------------------------------------------------------
+# Backup: full_job / remote
+# ------------------------------------------------------------------------------
+
+[jobs.full_job.backup.remote]
+backend = "restic"
+repository = "rclone:backup_remote:full_job/remote"
+schedule = "30 2 * * *"
+
+# sources/source_files are task-only. Here, sources = [] simply means
+# "no sources, only source_files". There is no parent value, so there is no
+# inheritance to stop.
+sources = []
+source_files = ["/config/sources/remote.txt"]
+tags = ["remote", "full_job"]
+# In contrast, exclude = [] intentionally stops inheritance of exclude defaults.
+exclude = []
+exclude_files = ["/config/excludes/remote.txt"]
+
+backup_timeout = 7200
+hook_timeout = 600
+retention = true
+cleanup = false
+auto_init = true
+exclude_caches = true
+one_file_system = true
+keep_last = 30
+keep_daily = 14
+keep_weekly = 8
+keep_monthly = 12
+keep_yearly = 5
+keep_within = "1y"
+keep_within_monthly = "5y"
+extra_restic_backup_args = []
+extra_restic_forget_args = ["--group-by tags"]
+extra_restic_prune_args = ["--max-unused 10%", "--max-repack-size 2G"]
+pre_hooks = ["/scripts/pre-remote.sh"]
+post_hooks = ["/scripts/post-remote.sh"]
+on_error_hooks = ["/scripts/on-error-remote.sh"]
+notify_on_success = true
+notify_on_error = true
+notify_on_skipped = true
+
+# Borg illustration; not implemented and left commented out:
+# extra_borg_create_args = []
+# extra_borg_prune_args = []
+# extra_borg_compact_args = []
+
+
+# ------------------------------------------------------------------------------
+# Rclone tasks: full_job
+# Subtasks of [jobs.full_job.rclone]; inherit defaults from that section.
+# ------------------------------------------------------------------------------
+
+[jobs.full_job.rclone.offsite]
+source = "/backups/full_job/local"
+target = "backup_remote:full_job/local"
+sync_delete = false
+schedule = "0 4 * * *"
+transfers = 6
+checkers = 12
+bwlimit = "15M"
+exclude = ["*.lock", "tmp/**"]
+filter_from = "/config/rclone-filter.txt"
+extra_rclone_args = ["--progress", "--metadata"]
+rclone_timeout = 7200
+hook_timeout = 300
+pre_hooks = ["/scripts/pre-rclone-offsite.sh"]
+post_hooks = ["/scripts/post-rclone-offsite.sh"]
+on_error_hooks = ["/scripts/on-error-rclone-offsite.sh"]
+notify_on_success = true
+notify_on_error = true
+notify_on_skipped = true
+
+[jobs.full_job.rclone.Nextcloud]
+source = "/data/documents"
+target = "nextcloud:Backups/full_job/documents"
+sync_delete = true
+schedule = "15 4 * * *"
+transfers = 4
+checkers = 8
+bwlimit = "8M"
+exclude = ["*.tmp", "~$*"]
+filter_from = "/config/rclone-nextcloud-filter.txt"
+extra_rclone_args = ["--create-empty-src-dirs"]
+rclone_timeout = 5400
+hook_timeout = 300
+pre_hooks = ["/scripts/pre-rclone-nextcloud.sh"]
+post_hooks = ["/scripts/post-rclone-nextcloud.sh"]
+on_error_hooks = ["/scripts/on-error-rclone-nextcloud.sh"]
+notify_on_success = true
+notify_on_error = true
+notify_on_skipped = true
+
+
+# ------------------------------------------------------------------------------
+# Workflows: full_job
+# ------------------------------------------------------------------------------
+
+[jobs.full_job.workflow.daily]
+schedule = "0 3 * * *"
+steps = ["backup.local", "backup.remote.backup", "rclone.offsite", "rclone.Nextcloud"]
+hook_timeout = 120
+pre_hooks = ["/scripts/pre-workflow-daily.sh"]
+post_hooks = ["/scripts/post-workflow-daily.sh"]
+on_error_hooks = ["/scripts/on-error-workflow-daily.sh"]
+notify_on_success = true
+notify_on_error = true
+notify_on_skipped = true
+
+[jobs.full_job.workflow.maintenance]
+schedule = "0 5 * * 0"
+steps = ["backup.local.retention", "backup.local.cleanup", "backup.remote.retention"]
+pre_hooks = ["/scripts/pre-maintenance.sh"]
+post_hooks = ["/scripts/post-maintenance.sh"]
+on_error_hooks = ["/scripts/on-error-maintenance.sh"]
+notify_on_success = true
+notify_on_error = true
+notify_on_skipped = true

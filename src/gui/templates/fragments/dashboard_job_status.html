@@ -1,0 +1,23 @@
+<div
+  id="dashboard-job-status-{{ job.name }}"
+  class="panel-header"
+  hx-get="/dashboard/jobs/{{ job.name }}/status"
+  hx-trigger="run-status-changed from:body, every {{ '3s' if job.is_running else '10s' }} [document.visibilityState=='visible']"
+  hx-swap="outerHTML"
+>
+  <div class="flex items-center gap-3">
+    <div class="dashboard-status-dot rounded-full {{ 'bg-green-400 animate-pulse' if job.is_running else ('bg-amber-300 dark:bg-amber-500' if job.run_status_unknown else 'bg-slate-300 dark:bg-slate-600') }}"></div>
+    <span class="dashboard-job-title text-slate-900 dark:text-slate-100">{{ job.name }}</span>
+    {% if job.is_running %}
+    <span class="badge badge-success">running</span>
+    {% elif job.run_status_unknown %}
+    <span class="badge badge-warning">Status unknown</span>
+    {% endif %}
+  </div>
+  <div class="flex items-center gap-4">
+    <a href="/diagnostics/logs?job={{ job.name }}"
+       class="text-link-muted text-xs">
+      Logs →
+    </a>
+  </div>
+</div>

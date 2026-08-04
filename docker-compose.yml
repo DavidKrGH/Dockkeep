@@ -1,0 +1,34 @@
+services:
+  app:
+    image: ghcr.io/davidkrgh/dockkeep:latest
+    container_name: dockkeep
+    hostname: homeserver
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    env_file:
+      - .env
+
+    volumes:
+      # Configuration and generated app data
+      - ./config:/config
+      - ./appdata:/appdata         # SQLite app data: run history, restore records, backup stats, run control
+
+      # Backup sources and targets
+      - /path/to/data:/data:ro
+      - ./backups:/backups
+      - ./restore:/restore
+
+      # Logs
+      - ./logs:/logs
+
+      # Optional: hook scripts and Docker control from hooks
+      # - ./scripts:/scripts
+      # - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+      # Runtime defaults for the example deployment
+      TZ: ${TZ:-Europe/Berlin}
+      DK_MODE: ${DK_MODE:-gui}   # gui = web UI + scheduler, cli = headless scheduler

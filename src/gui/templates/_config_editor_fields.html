@@ -1,0 +1,333 @@
+{% from "_macros.html" import help_link %}
+
+{% macro editor_groups(groups, disabled=false, collapsible=true) %}
+  {% for group in groups | default([]) %}
+  {% if collapsible %}
+  <details class="panel-soft" {% if group.open %}open{% endif %}>
+    <summary class="flex cursor-pointer select-none list-none items-center gap-2 rounded-md px-4 py-2.5
+                    text-xs font-semibold uppercase text-slate-500 dark:text-slate-400
+                    hover:bg-slate-50 dark:hover:bg-slate-700/30">
+      <svg class="chevron h-4 w-4 shrink-0 transition-transform" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+      </svg>
+      {{ group.title }}
+    </summary>
+  {% endif %}
+    <div class="form-grid{% if collapsible %} p-4{% endif %}">
+      {% for field in group.fields %}
+      <div class="{% if field.kind in ['list', 'checklist'] %}form-field-full{% endif %}" {% if field.cron %}data-cron-field{% endif %} {% if field.info_panels %}data-field-info-scope{% endif %}>
+        {% if field.cron or field.info_panels %}
+        <div class="form-label form-label-with-action">
+          <span class="form-label-text">
+            {{ field.label }}
+            {% if field.inherited %}
+            <span class="ml-1 text-blue-500 dark:text-blue-400 italic">(inherited)</span>
+            {% endif %}
+          {% if field.cron %}
+          <button type="button"
+                  class="field-info-button"
+                  aria-expanded="false"
+                  aria-label="Show cron syntax"
+                  title="Show cron syntax"
+                  data-cron-help-toggle>
+            i
+          </button>
+          {% else %}
+          <button type="button"
+                  class="field-info-button"
+                  aria-expanded="false"
+                  aria-label="Show {{ field.label | lower }} help"
+                  title="Show {{ field.label | lower }} help"
+                  data-field-info-toggle>
+            i
+          </button>
+          {% endif %}
+          </span>
+        </div>
+        {% else %}
+        <label class="form-label">
+          {{ field.label }}
+          {% if field.inherited %}
+          <span class="ml-1 text-blue-500 dark:text-blue-400 italic">(inherited)</span>
+          {% endif %}
+        </label>
+        {% endif %}
+        {% if field.kind == "bool" %}
+        <select name="{{ field.name }}"
+                {% if disabled %}disabled{% endif %}
+                class="form-control w-fit">
+          <option value="" {% if field.value == "" %}selected{% endif %}>—{% if field.hint %} (inherited: {{ field.hint }}){% elif field.default_hint %} (default: {{ field.default_hint }}){% endif %}</option>
+          <option value="true" {% if field.value == "true" %}selected{% endif %}>yes</option>
+          <option value="false" {% if field.value == "false" %}selected{% endif %}>no</option>
+        </select>
+        {% elif field.kind == "checklist" %}
+        <input type="hidden"
+               name="{{ field.name }}"
+               value=""
+               {% if disabled %}disabled{% endif %}>
+        <div class="checklist-field" role="group" aria-label="{{ field.label }}">
+          {% for choice in field.choices %}
+          <label class="form-check checklist-option">
+            <input type="checkbox"
+                   name="{{ field.name }}__{{ choice }}"
+                   value="true"
+                   {% if choice in field.selected_choices %}checked{% endif %}
+                   {% if disabled %}disabled{% endif %}>
+            <span>{{ choice }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% elif field.kind == "list" %}
+        <textarea name="{{ field.name }}" rows="2"
+                  data-list-value
+                  data-editor-disabled="{{ 'true' if disabled else 'false' }}"
+                  placeholder="{{ field.hint }}"
+                  {% if field.required %}required{% endif %}
+                  {% if disabled %}disabled{% endif %}
+                  class="form-control font-mono{% if field.inherited %} inherited-placeholder{% endif %}">{{ field.value }}</textarea>
+        {% if field.inheritable %}
+        <label class="form-check mt-2">
+          <input type="checkbox"
+                 name="{{ field.empty_name }}"
+                 value="true"
+                 data-list-empty
+                 data-editor-disabled="{{ 'true' if disabled else 'false' }}"
+                 {% if field.empty_checked %}checked{% endif %}
+                 {% if disabled %}disabled{% endif %}>
+          <span>Override with empty value</span>
+        </label>
+        {% endif %}
+        {% elif field.kind == "select" %}
+        <select name="{{ field.name }}"
+                {% if disabled %}disabled{% endif %}
+                class="form-control">
+          <option value="">—{% if field.hint %} (inherited: {{ field.hint }}){% elif field.default_hint %} (default: {{ field.default_hint }}){% endif %}</option>
+          {% for choice in field.choices %}
+          <option value="{{ choice }}" {% if field.value == choice %}selected{% endif %}>{{ choice }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="{{ 'number' if field.kind == 'number' else 'text' }}"
+               name="{{ field.name }}"
+               value="{{ field.value }}"
+               placeholder="{% if field.hint %}{{ field.hint }}{% elif field.default_hint %}default: {{ field.default_hint }}{% endif %}"
+               {% if field.required %}required{% endif %}
+               {% if disabled %}disabled{% endif %}
+               {% if field.cron %}data-cron-schedule{% endif %}
+               class="form-control font-mono{% if field.inherited %} inherited-placeholder{% endif %}">
+        {% endif %}
+        {% if field.cron %}
+        <div class="cron-preview" data-cron-preview aria-live="polite">
+          <p class="cron-preview-status" data-cron-status></p>
+          <ol class="cron-preview-runs" data-cron-runs></ol>
+        </div>
+        <div class="cron-help" data-cron-help hidden>
+          <p><strong>Syntax:</strong> minute hour day month weekday</p>
+          <p><code>*</code> = any value, <code>*/15</code> = every 15, <code>1,2,3</code> = list, <code>1-5</code> = range.</p>
+          <p>Examples: <code>0 2 * * *</code> daily at 02:00, <code>*/30 * * * *</code> every 30 minutes, <code>0 3 * * 1-5</code> weekdays at 03:00.</p>
+        </div>
+        {% endif %}
+        {% if field.info_panels %}
+        <div class="field-info-panels" data-field-info-panels>
+          {% for panel in field.info_panels %}
+          <div class="field-info-panel"
+               data-field-info-panel
+               {% if panel.backend %}data-backend="{{ panel.backend }}"{% endif %}
+               hidden>
+            <p>
+              <strong>{{ panel.title }}</strong>
+              {% if panel.help_anchor %}{{ help_link(panel.help_anchor, "Open help: " ~ panel.title) }}{% endif %}
+            </p>
+            {% for line in panel.lines %}
+            <p>{{ line }}</p>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if field.help_text %}
+        <p class="form-help">{{ field.help_text }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  {% if collapsible %}</details>{% endif %}
+  {% endfor %}
+{% endmacro %}
+
+{% macro credential_info_panel() %}
+<div class="field-info-panel" data-field-info-panel hidden>
+  <p><strong>Restic credentials via environment</strong></p>
+  <p>Define a variable such as <code>DK_RESTIC_PASSWORD</code> in <code>.env</code>. The example <code>docker-compose.yml</code> loads <code>.env</code> via <code>env_file</code>, so uncommented values are available inside the container.</p>
+  <p>In this editor, choose <strong>Environment variable</strong> and enter the variable name, for example <code>DK_RESTIC_PASSWORD</code>. Dockkeep resolves it at runtime and passes it to Restic.</p>
+  <p>For another repository, use another passed-through variable such as <code>DK_RESTIC_PASSWORD_SECONDARY</code>. A mounted password file can be used with <strong>Password file</strong> and an absolute path such as <code>/passwords/restic.pw</code>.</p>
+</div>
+{% endmacro %}
+
+{% macro credential_controls(credential) %}
+<div class="grid gap-3" data-credential-scope>
+  <select name="credential__mode"
+          data-credential-mode
+          class="form-control">
+    {% for value, label in credential.modes | default([]) %}<option value="{{ value }}" {% if credential.mode == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  {% if credential.parent_configured and credential.mode in ("inherit", "unset") %}<p class="form-help text-blue-600">{{ credential.parent_hint | default('An inherited password is configured and is not disclosed.', true) }}</p>{% endif %}
+  {% if credential.password_reentry_required %}<p class="form-help text-amber-600">Direct passwords are not shown again after errors. Please re-enter before saving.</p>{% endif %}
+  <div data-cred="env">
+    <input type="text" name="credential__password_env" value="{{ credential.password_env | default('') }}" placeholder="DK_RESTIC_PASSWORD" class="form-control font-mono">
+  </div>
+  <div data-cred="file">
+    <input type="text" name="credential__password_file" value="{{ credential.password_file | default('') }}" placeholder="/passwords/restic.pw" class="form-control font-mono">
+  </div>
+  <div data-cred="password">
+    <input type="password" name="credential__password" value="" placeholder="{{ 'Keep or replace direct password' if credential.password_configured else 'Set direct password' }}" class="form-control">
+  </div>
+</div>
+{% endmacro %}
+
+{% macro repository_options(group, credential) %}
+<details class="panel-soft" {% if group.open %}open{% endif %}>
+  <summary class="flex cursor-pointer select-none list-none items-center gap-2 rounded-md px-4 py-2.5
+                  text-xs font-semibold uppercase text-slate-500 dark:text-slate-400
+                  hover:bg-slate-50 dark:hover:bg-slate-700/30">
+    <svg class="chevron h-4 w-4 shrink-0 transition-transform" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+    </svg>
+    {{ group.title }}
+  </summary>
+  <div class="grid gap-4 p-4">
+    {{ editor_groups([group], collapsible=false) }}
+    <div data-field-info-scope>
+      <div class="form-label form-label-with-action">
+        <span class="form-label-text">
+          Repository password
+          <button type="button"
+                  class="field-info-button"
+                  aria-expanded="false"
+                  aria-label="Show repository password help"
+                  title="Show repository password help"
+                  data-field-info-toggle>
+            i
+          </button>
+        </span>
+      </div>
+      {{ credential_info_panel() }}
+      {{ credential_controls(credential) }}
+    </div>
+  </div>
+</details>
+{% endmacro %}
+
+{% macro global_backup_group(repository_group, credential, groups) %}
+  {% set state = namespace(open=repository_group.open) %}
+  {% for group in groups | default([]) %}
+    {% if group.open %}
+      {% set state.open = true %}
+    {% endif %}
+  {% endfor %}
+<details class="panel-soft" {% if state.open %}open{% endif %}>
+  <summary class="flex cursor-pointer select-none list-none items-center gap-2 rounded-md px-4 py-2.5
+                  text-xs font-semibold uppercase text-slate-500 dark:text-slate-400
+                  hover:bg-slate-50 dark:hover:bg-slate-700/30">
+    <svg class="chevron h-4 w-4 shrink-0 transition-transform" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+    </svg>
+    Backup
+  </summary>
+  <div class="grid gap-3 p-4">
+    {{ repository_options(repository_group, credential) }}
+    {{ editor_groups(groups) }}
+  </div>
+</details>
+{% endmacro %}
+
+{% macro global_rclone_group(sync_group, options_group) %}
+  {% set state = namespace(open=sync_group.open or options_group.open) %}
+<details class="panel-soft" {% if state.open %}open{% endif %}>
+  <summary class="flex cursor-pointer select-none list-none items-center gap-2 rounded-md px-4 py-2.5
+                  text-xs font-semibold uppercase text-slate-500 dark:text-slate-400
+                  hover:bg-slate-50 dark:hover:bg-slate-700/30">
+    <svg class="chevron h-4 w-4 shrink-0 transition-transform" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+    </svg>
+    Rclone
+  </summary>
+  <div class="grid gap-3 p-4">
+    {{ editor_groups([sync_group], collapsible=false) }}
+    {{ editor_groups([options_group]) }}
+  </div>
+</details>
+{% endmacro %}
+
+{% macro notifications_group(group, providers) %}
+<details class="panel-soft" {% if group.open %}open{% endif %}>
+  <summary class="flex cursor-pointer select-none list-none items-center gap-2 rounded-md px-4 py-2.5
+                  text-xs font-semibold uppercase text-slate-500 dark:text-slate-400
+                  hover:bg-slate-50 dark:hover:bg-slate-700/30">
+    <svg class="chevron h-4 w-4 shrink-0 transition-transform" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+    </svg>
+    {{ group.title }}
+  </summary>
+  <div class="grid gap-3 p-4">
+    {{ editor_groups([group], collapsible=false) }}
+    {{ provider_fields(providers) }}
+  </div>
+</details>
+{% endmacro %}
+
+{% macro provider_fields(providers) %}
+  {% for provider in providers | default([]) %}
+  <details class="panel-soft" data-provider="{{ provider.name }}">
+    <summary class="flex cursor-pointer select-none list-none items-center gap-2 rounded-md px-4 py-2.5
+                    text-xs font-semibold uppercase text-slate-500 dark:text-slate-400
+                    hover:bg-slate-50 dark:hover:bg-slate-700/30">
+      <svg class="chevron h-4 w-4 shrink-0 transition-transform" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+      </svg>
+      {{ provider.title }}
+    </summary>
+    <div class="p-4 grid gap-3">
+      <label class="block">
+        <span class="form-label">Provider</span>
+        <select name="{{ provider.name }}__enabled"
+                class="form-control w-fit"
+                data-provider-toggle>
+          <option value="false" {% if not provider.enabled %}selected{% endif %}>Disabled</option>
+          <option value="true" {% if provider.enabled %}selected{% endif %}>Active</option>
+        </select>
+      </label>
+      <div data-provider-fields>
+        {{ editor_groups(provider.groups, disabled=not provider.enabled, collapsible=false) }}
+      </div>
+      <div class="flex items-center gap-3">
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                hx-post="/config/global/providers/{{ provider.name }}/test"
+                hx-include="closest form"
+                hx-target="#provider-test-{{ provider.name }}"
+                hx-indicator="#provider-test-indicator-{{ provider.name }}"
+                hx-swap="innerHTML"
+                data-provider-test
+                {% if not provider.enabled %}disabled{% endif %}>
+          Test provider
+        </button>
+        <button type="button"
+                class="btn btn-secondary btn-sm"
+                hx-post="/config/global/providers/{{ provider.name }}/test-report"
+                hx-include="closest form"
+                hx-target="#provider-test-{{ provider.name }}"
+                hx-indicator="#provider-test-indicator-{{ provider.name }}"
+                hx-swap="innerHTML"
+                data-provider-test-report
+                {% if not provider.enabled %}disabled{% endif %}>
+          Test report
+        </button>
+        <span id="provider-test-indicator-{{ provider.name }}"
+              class="htmx-indicator text-sm text-slate-500 dark:text-slate-400">Testing...</span>
+      </div>
+      <div id="provider-test-{{ provider.name }}"></div>
+    </div>
+  </details>
+  {% endfor %}
+{% endmacro %}

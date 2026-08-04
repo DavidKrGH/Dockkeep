@@ -1,0 +1,67 @@
+# Git
+.git/
+.gitignore
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.egg-info/
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Testing & Coverage
+tests/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Laufzeit-Verzeichnisse (lokal via Env konfigurierbar)
+logs/
+backups/
+appdata/
+restore/
+var_lock/
+scripts/
+
+# Konfiguration (wird zur Laufzeit per Volume gemountet)
+config/
+!config/config.template.toml
+!config/rclone.conf.example
+
+# Dokumentation
+*.md
+!README.md
+!THIRD-PARTY-NOTICES.md
+
+# Docker-Compose-Dateien (nicht im Image nötig)
+docker-compose*.yml
+
+# Dev-Tools
+Makefile
+requirements-dev.txt
+skills
+.claude/
+.codex/
+.agents/
+*.egg-info/
+.ruff_cache
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets
+.env
+.env.*

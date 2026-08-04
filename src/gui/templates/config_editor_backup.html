@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% from "_config_editor_nav.html" import job_sidebar %}
+{% from "_macros.html" import alert_error, alert_success, page_header %}
+{% from "_config_editor_fields.html" import editor_groups, repository_options %}
+{% block title %}{% if is_new %}Create backup{% else %}Edit backup: {{ backup_name }}{% endif %} - Dockkeep{% endblock %}
+{% block content %}
+{{ config_tabs("jobs") }}
+{{ page_header(
+  "Create backup" if is_new else "Edit backup: " ~ backup_name,
+  none,
+  [
+    {"label": "Configuration", "href": "/config/jobs"},
+    {"label": job_name, "href": "/config/jobs/" ~ job_name ~ "/effective"},
+    {"label": "Create backup" if is_new else backup_name}
+  ]
+) }}
+<div class="config-layout">
+  {{ job_sidebar(job_nav, job_nav_active, job_nav_resource, job_nav_jobs) }}
+  <div class="config-main">
+    {{ alert_error(form_data.error) }}
+    {{ alert_success("Saved.", dismissible=true) if saved }}
+    {% if not is_new %}
+    <form id="delete-form" method="post"
+          action="/config/jobs/{{ job_name }}/backups/{{ backup_name }}/delete"
+          hx-post="/config/jobs/{{ job_name }}/backups/{{ backup_name }}/delete"
+          hx-swap="none"
+          hx-confirm="Really delete backup &quot;{{ backup_name }}&quot;? This action cannot be undone."></form>
+    {% endif %}
+    <form method="post" action="{{ '/config/jobs/' ~ job_name ~ '/backups/new' if is_new else '/config/jobs/' ~ job_name ~ '/backups/' ~ backup_name }}"
+          class="panel panel-body grid gap-5">
+      <input type="hidden" name="_schema_form" value="1">
+      <section class="panel-soft p-4">
+        <div class="grid gap-4">
+          <label><span class="form-label">Name</span><input type="text" name="name" value="{{ form_data.name | default('') }}" required class="form-control"></label>
+          {{ editor_groups(form_data.groups[:1], collapsible=false) }}
+          <label><span class="form-label">Repository</span><input type="text" name="repository" value="{{ form_data.repository | default('') }}" required class="form-control font-mono"></label>
+        </div>
+      </section>
+      {% if form_data.groups | length > 1 %}
+      {{ repository_options(form_data.groups[1], form_data.credential) }}
+      {% endif %}
+      {{ editor_groups(form_data.groups[2:]) }}
+      <div class="form-actions justify-between">
+        <div class="form-actions">
+          <button class="btn btn-primary">Save</button>
+          <a href="/config/jobs" class="btn btn-secondary">Cancel</a>
+        </div>
+        {% if not is_new %}
+        <button type="submit" form="delete-form" class="btn btn-danger btn-sm">
+          Delete
+        </button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/config-editor-form.js') }}?v={{ asset_version }}" defer></script>
+{% endblock %}

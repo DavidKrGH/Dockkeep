@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% from "_macros.html" import alert_error, alert_success, alert_warning, help_link %}
+{% from "_config_editor_fields.html" import editor_groups, global_backup_group, global_rclone_group, notifications_group, provider_fields %}
+{% block title %}Structured Config Editor — Dockkeep{% endblock %}
+
+{% macro _truncated(items) %}
+{%- if not items -%}
+—
+{%- else -%}
+{{ items[:2] | join(", ") }}{% if items | length > 2 %} +{{ items | length - 2 }} more{% endif %}
+{%- endif -%}
+{% endmacro %}
+
+{% macro _resource_name(name, valid, url) %}
+<span class="config-table-resource">
+  {% if valid %}
+  <a href="{{ url }}" class="text-link">{{ name }}</a>
+  {% else %}
+  <span title="Invalid name: please fix in the raw editor">{{ name }}</span>
+  {% endif %}
+</span>
+{% endmacro %}
+
+{% macro _group_row(label) %}
+<tr class="config-table-group">
+  <td colspan="4">{{ label }}</td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+{{ config_tabs("jobs") }}
+{% set new_job_form = new_job_form | default({"name": "", "error": none}) %}
+{% set new_job_modal_open = new_job_modal_open | default(false) %}
+
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Backup jobs</h1>
+    <p class="page-subtitle">
+      Edit global settings, jobs, backups, workflows, and rclone tasks.
+      {{ help_link("config", "Help: creating and editing the configuration") }}
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="/config/raw" class="btn btn-secondary btn-sm">Raw config</a>
+    <button type="button" class="btn btn-primary" data-open-dialog="new-job-dialog">
+      + Create new job
+    </button>
+  </div>
+</div>
+
+<dialog id="new-job-dialog" class="modal-dialog" {% if new_job_modal_open %}open{% endif %}>
+  <form method="post" action="/config/jobs/new" class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Create job</h2>
+      <button type="button" class="modal-close" data-close-dialog="new-job-dialog" aria-label="Close">
+        &times;
+      </button>
+    </div>
+    <div class="modal-body grid gap-4">
+      {{ alert_error(new_job_form.error) }}
+      <input type="hidden" name="_schema_form" value="1">
+      <label>
+        <span class="form-label">Name</span>
+        <input type="text"
+               name="name"
+               value="{{ new_job_form.name | default('') }}"
+               required
+               autofocus
+               class="form-control font-mono">
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Create new job</button>
+      <button type="button" class="btn btn-secondary" data-close-dialog="new-job-dialog">
+        Cancel
+      </button>
+    </div>
+  </form>
+</dialog>
+
+{{ alert_error(overview.error) }}
+{{ alert_warning(overview.warnings) }}
+{% if overview.active_config_error %}
+{{ alert_warning("The active configuration is invalid (" ~ (overview.active_config_error.split("\n") | first | trim) ~ "). Runs and the scheduler will fail until it is fixed — open the raw editor via the Raw config button for details.") }}
+{% endif %}
+
+<details class="config-collapse mb-5" {% if global_open %}open{% endif %}>
+  <summary class="config-collapse-summary">Global settings</summary>
+  <div class="config-collapse-body">
+    {{ alert_error(global_form.error) }}
+    {{ alert_success("Saved.", dismissible=true) if global_saved }}
+    <form method="post" action="/config/global" class="grid gap-5">
+      <input type="hidden" name="_schema_form" value="1">
+      {{ editor_groups(global_form.groups[:1]) }}
+      {% if global_form.groups | length > 4 %}
+      {{ global_backup_group(global_form.groups[1], global_form.credential, global_form.groups[2:5]) }}
+      {% if global_form.groups | length > 6 %}
+      {{ global_rclone_group(global_form.groups[5], global_form.groups[6]) }}
+      {% endif %}
+      {% if global_form.groups | length > 7 %}
+      {{ notifications_group(global_form.groups[7], global_form.providers) }}
+      {% endif %}
+      {% else %}
+      {{ editor_groups(global_form.groups[2:]) }}
+      {{ provider_fields(global_form.providers) }}
+      {% endif %}
+      <div class="form-actions justify-end">
+        <button class="btn btn-primary">Save</button>
+        <a href="/config/jobs" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</details>
+
+{% if overview.jobs %}
+<div class="panel">
+  <div class="list-scroll">
+    <table class="data-table list-table config-overview-table">
+      <colgroup>
+        <col class="config-overview-col-resource">
+        <col class="config-overview-col-endpoint">
+        <col class="config-overview-col-endpoint">
+        <col class="config-overview-col-actions">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Job / resource</th>
+          <th>Source</th>
+          <th>Target</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in overview.jobs %}
+        <tr class="config-table-job">
+          <td class="font-mono font-bold" colspan="3">
+            {{ job.name }}
+            {% if not job.name_valid %}
+            <span class="badge badge-danger" title="Invalid name: please fix in the raw editor">
+              Invalid name
+            </span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            {% if job.name_valid %}
+            <div class="list-actions">
+              {# Bei invalider aktiver Config kann die Effective-Seite nur eine
+                 Fehlerseite zeigen — dann direkt in die Job settings. #}
+              <a href="/config/jobs/{{ job.name }}{{ '' if overview.active_config_error else '/effective' }}" class="btn btn-primary btn-sm">
+                Open job →
+              </a>
+              <form method="post"
+                    action="/config/jobs/{{ job.name }}/delete"
+                    hx-post="/config/jobs/{{ job.name }}/delete"
+                    hx-swap="none"
+                    hx-disabled-elt="find button"
+                    hx-confirm="Really delete job &quot;{{ job.name }}&quot; with all backups, workflows, and Rclone tasks? This action cannot be undone.">
+                <button type="submit" class="btn btn-danger btn-sm">
+                  Delete
+                </button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% if job.workflow_names %}
+        {{ _group_row("Workflows") }}
+        {% for name in job.workflow_names %}
+        {% set details = job.workflow_details.get(name, {}) %}
+        <tr>
+          <td>{{ _resource_name(name, job.name_valid and job.workflow_name_valid.get(name), "/config/jobs/" ~ job.name ~ "/workflows/" ~ name) }}</td>
+          <td class="config-table-detail" colspan="2">{{ details.steps | join(" → ") if details.steps else "—" }}</td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+        {% if job.backup_names %}
+        {{ _group_row("Backups") }}
+        {% for name in job.backup_names %}
+        {% set details = job.backup_details.get(name, {}) %}
+        {% set ns = namespace(entries=[]) %}
+        {% for s in details.sources or [] %}{% set ns.entries = ns.entries + [s] %}{% endfor %}
+        {% for f in details.source_files or [] %}{% set ns.entries = ns.entries + ["list: " ~ f] %}{% endfor %}
+        <tr>
+          <td>{{ _resource_name(name, job.name_valid and job.backup_name_valid.get(name), "/config/jobs/" ~ job.name ~ "/backups/" ~ name) }}</td>
+          <td class="config-table-detail">{{ _truncated(ns.entries) }}</td>
+          <td class="config-table-detail">{{ details.repository or "—" }}</td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+        {% if job.rclone_names %}
+        {{ _group_row("Rclone tasks") }}
+        {% for name in job.rclone_names %}
+        {% set details = job.rclone_details.get(name, {}) %}
+        <tr>
+          <td>{{ _resource_name(name, job.name_valid and job.rclone_name_valid.get(name), "/config/jobs/" ~ job.name ~ "/rclone/" ~ name) }}</td>
+          <td class="config-table-detail">{{ details.source or "—" }}</td>
+          <td class="config-table-detail">{{ details.target or "—" }}</td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <p class="text-sm">No jobs configured yet.</p>
+  <button type="button" class="btn btn-primary mt-4" data-open-dialog="new-job-dialog">
+    Create first job
+  </button>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/config-editor-form.js') }}?v={{ asset_version }}" defer></script>
+{% endblock %}

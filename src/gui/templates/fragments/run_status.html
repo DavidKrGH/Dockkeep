@@ -1,0 +1,49 @@
+{% from "_macros.html" import status_badge %}
+{% set status = run.status | default("unknown") %}
+{% set tone = run.status_tone | default("slate") %}
+{% set label = run.status_label | default("Unknown status") %}
+{% set active = run.is_active | default(false) %}
+{% set action_job = run.action_job | default(run.job | default("")) %}
+{% set action_step = run.action_step | default(run.step | default("")) %}
+{% set dry_run = run.dry_run | default(false) %}
+{% set action_base = "/jobs/" ~ action_job ~ "/" ~ action_step %}
+{% set hide_run_action = hide_run_action | default(false) %}
+{% set status_poll_url = run.status_url ~ ("?actions=0" if hide_run_action else "") %}
+<span
+  class="run-status inline-flex items-center gap-2"
+  {% if active %}
+    hx-get="{{ status_poll_url }}"
+    hx-trigger="every 3s [document.visibilityState=='visible']"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  {{ status_badge(status, ("Dry Run " if dry_run and active else "") ~ label, tone, active) }}
+  {% if run.error %}
+    <span class="max-w-xs truncate text-xs text-slate-500 dark:text-slate-400" title="{{ run.error }}">{{ run.error }}</span>
+  {% endif %}
+  {% if run.is_cancellable and run.cancel_url and not hide_run_action %}
+    <button
+      hx-post="{{ run.cancel_url ~ ('?actions=0' if hide_run_action else '') }}"
+      hx-target="closest .run-status"
+      hx-swap="outerHTML"
+      class="btn btn-danger btn-sm">
+      Cancel
+    </button>
+  {% endif %}
+  {% if not active and action_job and action_step and not hide_run_action %}
+    <button
+      hx-post="{{ action_base }}/run"
+      hx-target="closest .run-status"
+      hx-swap="outerHTML"
+      class="btn btn-primary btn-sm">
+      &#9654; Start
+    </button>
+    <button
+      hx-post="{{ action_base }}/dry-run"
+      hx-target="closest .run-status"
+      hx-swap="outerHTML"
+      class="btn btn-warning btn-sm">
+      &#9655; Dry Run
+    </button>
+  {% endif %}
+</span>

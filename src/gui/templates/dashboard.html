@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% from "_macros.html" import run_buttons, alert_config_error %}
+{% block title %}Dashboard — Dockkeep{% endblock %}
+
+{% block head %}
+{% if jobs %}
+<script src="{{ url_for('static', path='/js/charts/chart.min.js') }}?v={{ asset_version }}" defer></script>
+<script src="{{ url_for('static', path='/js/dashboard-charts.js') }}?v={{ asset_version }}" defer></script>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Dashboard</h1>
+  </div>
+</div>
+
+{{ alert_config_error(config_error, "/config", "Edit config") }}
+
+{% if jobs %}
+<div class="dashboard-overview-grid mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="panel panel-body dashboard-chart-card lg:col-span-2">
+    <h2 class="dashboard-section-title mb-4">New data stored (cumulative)</h2>
+    {% if chart_data.growth %}
+    <div class="dashboard-growth-chart relative">
+      <canvas id="chart-repo-growth"></canvas>
+    </div>
+    {% else %}
+    <p class="empty-state-inline mt-4">No history data yet - shown after the first backup run.</p>
+    {% endif %}
+  </div>
+
+  <div class="dashboard-side-tiles">
+    <div class="panel panel-body dashboard-kpi-card">
+      <p class="dashboard-section-title">Health</p>
+      <div class="dashboard-kpi-value {{ 'dashboard-kpi-value-bad' if overview.failures_7d else 'dashboard-kpi-value-ok' }}">
+        {% if overview.failures_7d %}
+          {{ overview.failures_7d }} failure{{ "s" if overview.failures_7d != 1 }}
+        {% else %}
+          No failures
+        {% endif %}
+      </div>
+      <p class="dashboard-kpi-detail"><a href="/runs?status=failed" class="text-link">Last 7 days · failed runs →</a></p>
+    </div>
+
+    <div class="panel panel-body dashboard-kpi-card">
+      <p class="dashboard-section-title">Storage</p>
+      <div class="dashboard-kpi-value">{{ overview.total_repo_size_bytes | format_bytes }}</div>
+      <p class="dashboard-kpi-detail">
+        {{ overview.snapshots_count if overview.snapshots_count is not none else "–" }} snapshots
+        · {{ overview.backups_count }} backup{{ "s" if overview.backups_count != 1 }}
+        · {{ overview.jobs_count }} job{{ "s" if overview.jobs_count != 1 }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<script id="dashboard-chart-data" type="application/json">
+  {{ chart_data | tojson }}
+</script>
+
+{% include "fragments/dashboard_runs.html" %}
+{% endif %}
+
+{% if not jobs %}
+<div class="empty-state">
+  <p class="text-sm mb-2">No jobs configured.</p>
+  <a href="/config/jobs" class="text-link text-sm">Create config →</a>
+</div>
+{% endif %}
+
+{% for job in jobs %}
+<div class="mb-5 panel dashboard-job-card">
+  {% include "fragments/dashboard_job_status.html" %}
+
+  <div class="dashboard-job-body">
+    <div class="dashboard-job-meta flex flex-wrap items-center gap-x-4 gap-y-1 mb-4">
+      <span>{{ job.backups | length }} backups</span>
+      <span>{{ job.rclone | length }} rclone tasks</span>
+      <span>{{ job.workflows | length }} workflows</span>
+      <a href="/help#targets" class="text-link-muted text-xs">Targets ?</a>
+      <a href="{{ job.edit_url }}" class="text-link text-xs">Edit job →</a>
+      <a href="{{ job.effective_url }}" class="text-link text-xs">Effective config →</a>
+    </div>
+
+    {% if job.workflows %}
+    <div class="mb-4">
+      <p class="dashboard-section-title mb-2">Workflows</p>
+      <div class="panel list-panel">
+        <div class="list-scroll">
+          <table class="data-table list-table dashboard-task-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Steps</th>
+                <th>Next run</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for wf in job.workflows %}
+              <tr>
+                <td class="list-cell-primary">{{ wf.name }}</td>
+                <td>{{ wf.steps }}</td>
+                <td class="list-cell-time">{{ wf.next_run | format_datetime if wf.next_run else "manual only" }}</td>
+                <td class="text-right">
+                  <div class="list-actions">
+                    {{ run_buttons(job.name, "workflow." ~ wf.name) }}
+                    <a href="{{ wf.edit_url }}" class="btn btn-secondary btn-sm">Edit</a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if job.backups %}
+    <div class="mb-4">
+      <p class="dashboard-section-title mb-2">Backups</p>
+      <div class="panel list-panel">
+        <div class="list-scroll">
+          <table class="data-table list-table dashboard-task-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Last backup</th>
+                <th>Repo size</th>
+                <th>Next run</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for backup in job.backups %}
+              <tr>
+                <td>
+                  <span class="list-cell-primary">{{ backup.name }}</span>
+                  <div class="list-cell-mono list-cell-muted">{{ backup.repository }}</div>
+                </td>
+                <td>
+                  <span>{{ backup.last_backup_time | relative_time }}</span>
+                  {% if backup.last_backup_data_added_bytes is not none %}
+                  <div class="list-cell-muted">{{ backup.last_backup_data_added_bytes | format_bytes }} added</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <span>{{ backup.total_size_bytes | format_bytes }}</span>
+                  <div class="list-cell-muted">{{ backup.snapshots_count if backup.snapshots_count is not none else "–" }} snapshots</div>
+                </td>
+                <td class="list-cell-time">{{ backup.next_run | format_datetime if backup.next_run else "manual only" }}</td>
+                <td class="text-right">
+                  <div class="list-actions">
+                    {{ run_buttons(job.name, "backup." ~ backup.name) }}
+                    <a href="{{ backup.edit_url }}" class="btn btn-secondary btn-sm">Edit</a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if job.rclone %}
+    <div class="mb-4">
+      <p class="dashboard-section-title mb-2">Rclone</p>
+      <div class="panel list-panel">
+        <div class="list-scroll">
+          <table class="data-table list-table dashboard-task-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Source</th>
+                <th>Target</th>
+                <th>Next run</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for task in job.rclone %}
+              <tr>
+                <td class="list-cell-primary">{{ task.name }}</td>
+                <td class="list-cell-mono list-cell-muted">{{ task.source }}</td>
+                <td class="list-cell-mono list-cell-muted">{{ task.target }}</td>
+                <td class="list-cell-time">{{ task.next_run | format_datetime if task.next_run else "manual only" }}</td>
+                <td class="text-right">
+                  <div class="list-actions">
+                    {{ run_buttons(job.name, "rclone." ~ task.name) }}
+                    <a href="{{ task.edit_url }}" class="btn btn-secondary btn-sm">Edit</a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}

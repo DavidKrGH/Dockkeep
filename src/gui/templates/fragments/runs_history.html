@@ -1,0 +1,118 @@
+{% from "_macros.html" import run_task %}
+<div class="panel list-panel">
+  <div class="panel-header list-header">
+    <div>
+      <span class="list-title">Run history</span>
+      <span class="list-subtitle">
+        {{ history_runs | length }} shown - page {{ page or 1 }}{% if filters.is_active %} - filtered{% endif %}
+      </span>
+    </div>
+    <div class="list-actions">
+      {% if has_previous_page and previous_page_url %}
+      <a href="{{ previous_page_url }}" class="btn btn-secondary btn-sm">Previous</a>
+      {% endif %}
+      {% if has_next_page and next_page_url %}
+      <a href="{{ next_page_url }}" class="btn btn-secondary btn-sm">Next</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="GET" action="/runs" class="toolbar m-4">
+    <div class="flex flex-wrap gap-3 items-center">
+      <div class="flex items-center gap-2">
+        <label class="form-label" for="runs-job">Job:</label>
+        <select name="job" id="runs-job" data-auto-submit class="form-control">
+          <option value="">All jobs</option>
+          {% for option in filter_options.jobs %}
+          <option value="{{ option.value }}" {% if option.value == filters.job %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="form-label" for="runs-task">Task:</label>
+        <select name="task" id="runs-task" data-auto-submit class="form-control">
+          <option value="">All tasks</option>
+          {% for option in filter_options.tasks %}
+          <option value="{{ option.value }}" {% if option.value == filters.task %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="form-label" for="runs-status">Status:</label>
+        <select name="status" id="runs-status" data-auto-submit class="form-control">
+          <option value="">All statuses</option>
+          {% for option in filter_options.statuses %}
+          <option value="{{ option.value }}" {% if option.value == filters.status %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="form-label" for="runs-origin">Source:</label>
+        <select name="origin" id="runs-origin" data-auto-submit class="form-control">
+          <option value="">All sources</option>
+          {% for option in filter_options.origins %}
+          <option value="{{ option.value }}" {% if option.value == filters.origin %}selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% if filters.is_active %}
+    <a href="{{ filter_clear_url }}" class="btn btn-secondary btn-sm">Clear</a>
+    {% endif %}
+  </form>
+
+  {% if not history_runs %}
+  <div class="empty-state">
+    {% if filters.is_active %}
+    <p class="text-sm mb-2">No history entries match these filters.</p>
+    <p class="text-xs mb-4">Clear the filters to return to the complete run history.</p>
+    <a href="{{ filter_clear_url }}" class="btn btn-secondary btn-sm">Clear filters</a>
+    {% else %}
+    <p class="text-sm mb-2">No completed runs recorded yet.</p>
+    <p class="text-xs mb-4">Start a backup, workflow, Rclone task, or restore to create the first history entry.</p>
+    <a href="/" class="btn btn-secondary btn-sm">Open dashboard</a>
+    {% endif %}
+    {% if has_previous_page and previous_page_url %}
+    <div class="mt-4">
+      <a href="{{ previous_page_url }}" class="btn btn-secondary btn-sm">Previous</a>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="list-scroll">
+    <table class="data-table list-table">
+      <thead>
+        <tr>
+          <th class="runs-status-col">Status</th>
+          <th>Task</th>
+          <th>Source</th>
+          <th>Finished</th>
+          <th>Duration</th>
+          <th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in history_runs %}
+        <tr>
+          <td class="runs-status-col">{% set hide_run_action = true %}{% include "fragments/run_status.html" %}</td>
+          <td>{{ run_task(run, compact=true) }}</td>
+          <td><span class="badge badge-neutral">{{ run.origin_label or run.origin or "—" }}</span></td>
+          <td class="list-cell-time">{{ (run.finished_at or run.started_at or run.created_at) | format_datetime(seconds=true) }}</td>
+          <td class="list-cell-muted">{{ run.duration_seconds | format_duration }}</td>
+          <td class="text-right">
+            <div class="list-actions">
+              {% if run.detail_url %}
+              <a href="{{ run.detail_url }}" class="btn btn-secondary btn-sm">Details</a>
+              {% endif %}
+              {% if run.task_kind != "restore" and run.logs_url %}
+              <a href="{{ run.logs_url }}" class="btn btn-secondary btn-sm">Logs</a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>

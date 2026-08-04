@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% block title %}Rclone — Dockkeep{% endblock %}
+
+{% block content %}
+{{ config_tabs("remotes") }}
+
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Rclone remotes</h1>
+    <p class="page-subtitle">Create, edit, delete, and test simple remotes.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/config/remotes/raw" class="btn btn-secondary btn-sm">Raw rclone.conf</a>
+  </div>
+</div>
+
+<div id="rclone-management">
+  {% include "fragments/rclone_management.html" %}
+</div>
+{% endblock %}

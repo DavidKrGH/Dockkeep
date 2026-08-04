@@ -1,0 +1,6 @@
+{% from "_macros.html" import badge_tone_class %}
+<span class="badge {{ badge_tone_class(tone) }}"
+      data-status="{{ status }}"
+      {% if detail %}title="{{ detail }}"{% endif %}>
+  {{ symbol }} {{ label }}
+</span>

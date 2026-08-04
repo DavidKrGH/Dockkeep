@@ -1,0 +1,66 @@
+{% macro _sidebar_link(href, label, is_active, secondary=false) %}
+<a href="{{ href }}"
+   class="config-sidebar-link{{ ' config-sidebar-new' if secondary }} {{ 'config-sidebar-active' if is_active else '' }}"
+   {% if is_active %}aria-current="page"{% endif %}>
+  {{ label }}
+</a>
+{% endmacro %}
+
+{% macro job_sidebar(job_nav, active, resource=none, jobs=none) %}
+{% if job_nav and job_nav.name_valid %}
+<nav class="config-sidebar" aria-label="Job configuration">
+  {# Jobs with an invalid name have no reachable editor page, so they are dropped
+     before the count decides: otherwise a single valid job next to an invalid one
+     would render a switcher holding only the job already open. #}
+  {% set job_options = (jobs | default([], true)) | selectattr("name_valid") | list %}
+  {% if job_options | length > 1 %}
+  <label class="config-sidebar-job-switch">
+    <span class="config-sidebar-label">Job</span>
+    <select class="form-control config-sidebar-select font-mono"
+            aria-label="Switch job"
+            data-navigate-select>
+      {% for job in job_options %}
+      <option value="/config/jobs/{{ job.name }}/effective" {% if job.name == job_nav.name %}selected{% endif %}>{{ job.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% else %}
+  <p class="config-sidebar-title font-mono">{{ job_nav.name }}</p>
+  {% endif %}
+  <div class="config-sidebar-group">
+    <p class="config-sidebar-label">Job</p>
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/effective", "Effective config", active == "effective") }}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name, "Job settings", active == "settings") }}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/backup-defaults", "Backup defaults", active == "backup_defaults") }}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/rclone-defaults", "Rclone defaults", active == "rclone_defaults") }}
+  </div>
+  <div class="config-sidebar-group">
+    <p class="config-sidebar-label">Backups</p>
+    {% for name in job_nav.backup_names %}
+    {% if job_nav.backup_name_valid.get(name) %}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/backups/" ~ name, name, active == "backups" and resource == name) }}
+    {% endif %}
+    {% endfor %}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/backups/new", "+ New backup", active == "backups" and not resource, secondary=true) }}
+  </div>
+  <div class="config-sidebar-group">
+    <p class="config-sidebar-label">Rclone tasks</p>
+    {% for name in job_nav.rclone_names %}
+    {% if job_nav.rclone_name_valid.get(name) %}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/rclone/" ~ name, name, active == "rclone" and resource == name) }}
+    {% endif %}
+    {% endfor %}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/rclone/new", "+ New Rclone task", active == "rclone" and not resource, secondary=true) }}
+  </div>
+  <div class="config-sidebar-group">
+    <p class="config-sidebar-label">Workflows</p>
+    {% for name in job_nav.workflow_names %}
+    {% if job_nav.workflow_name_valid.get(name) %}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/workflows/" ~ name, name, active == "workflows" and resource == name) }}
+    {% endif %}
+    {% endfor %}
+    {{ _sidebar_link("/config/jobs/" ~ job_nav.name ~ "/workflows/new", "+ New workflow", active == "workflows" and not resource, secondary=true) }}
+  </div>
+</nav>
+{% endif %}
+{% endmacro %}

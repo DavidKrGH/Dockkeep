@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% from "_config_editor_nav.html" import job_sidebar %}
+{% from "_macros.html" import alert_error, alert_success, page_header %}
+{% from "_config_editor_fields.html" import editor_groups %}
+{% block title %}{% if is_new %}Create workflow{% else %}Edit workflow: {{ workflow_name }}{% endif %} - Dockkeep{% endblock %}
+{% block content %}
+{{ config_tabs("jobs") }}
+{{ page_header(
+  "Create workflow" if is_new else "Edit workflow: " ~ workflow_name,
+  none,
+  [
+    {"label": "Configuration", "href": "/config/jobs"},
+    {"label": job_name, "href": "/config/jobs/" ~ job_name ~ "/effective"},
+    {"label": "Create workflow" if is_new else workflow_name}
+  ]
+) }}
+<div class="config-layout">
+  {{ job_sidebar(job_nav, job_nav_active, job_nav_resource, job_nav_jobs) }}
+  <div class="config-main">
+    {{ alert_error(form_data.error) }}
+    {{ alert_success("Saved.", dismissible=true) if saved }}
+    {% if not is_new %}
+    <form id="delete-form" method="post"
+          action="/config/jobs/{{ job_name }}/workflows/{{ workflow_name }}/delete"
+          hx-post="/config/jobs/{{ job_name }}/workflows/{{ workflow_name }}/delete"
+          hx-swap="none"
+          hx-confirm="Really delete workflow &quot;{{ workflow_name }}&quot;? This action cannot be undone."></form>
+    {% endif %}
+    <form method="post" action="{{ '/config/jobs/' ~ job_name ~ '/workflows/new' if is_new else '/config/jobs/' ~ job_name ~ '/workflows/' ~ workflow_name }}"
+          class="panel panel-body grid gap-5">
+  <input type="hidden" name="_schema_form" value="1">
+  <section class="panel-soft p-4">
+    <div class="grid gap-4">
+      <label><span class="form-label">Name</span><input type="text" name="name" value="{{ form_data.name | default('') }}" required class="form-control"></label>
+      {{ editor_groups(form_data.groups[:1], collapsible=false) }}
+    </div>
+  </section>
+  <section class="workflow-builder" data-workflow-builder>
+    <div class="form-actions justify-between">
+      <div>
+        <label class="form-label" for="workflow-steps-value">Workflow steps</label>
+        <p class="form-help">Backup plan uses configured retention/cleanup options; forced actions run only the single step.</p>
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" data-add-step {% if not form_data.available_backups and not form_data.available_rclone_tasks %}disabled{% endif %}>
+        + Step
+      </button>
+    </div>
+    <textarea id="workflow-steps-value" name="steps" class="hidden">{{ form_data.steps | join('\n') if form_data.steps else '' }}</textarea>
+    <div class="workflow-step-list" data-step-list>
+      {% for step in form_data.step_rows | default([]) %}
+      <div class="workflow-step-row" data-step-row>
+        <div class="workflow-step-index" data-step-index>{{ loop.index }}</div>
+        <div class="workflow-step-fields">
+          <label>
+            <span class="form-label">Type</span>
+            <select class="form-control" data-step-kind>
+              <option value="backup" {% if step.kind == "backup" %}selected{% endif %}>Backup Task</option>
+              <option value="rclone" {% if step.kind == "rclone" %}selected{% endif %}>Rclone Task</option>
+            </select>
+          </label>
+          <label data-task-wrap>
+            <span class="form-label">Target</span>
+            <select class="form-control" data-step-task></select>
+          </label>
+          <label data-action-wrap>
+            <span class="form-label">Action</span>
+            <select class="form-control" data-step-action>
+              <option value="all" {% if step.action == "all" %}selected{% endif %}>Backup plan</option>
+              <option value="backup" {% if step.action == "backup" %}selected{% endif %}>Backup Task</option>
+              <option value="retention" {% if step.action == "retention" %}selected{% endif %}>Retention Task</option>
+              <option value="cleanup" {% if step.action == "cleanup" %}selected{% endif %}>Cleanup Task</option>
+            </select>
+          </label>
+        </div>
+        <div class="workflow-step-actions">
+          <button type="button" class="btn btn-secondary btn-sm workflow-icon-btn" data-move-up aria-label="Move step up" title="Move step up">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm workflow-icon-btn" data-move-down aria-label="Move step down" title="Move step down">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button type="button" class="btn btn-danger btn-sm workflow-icon-btn" data-remove-step aria-label="Remove step" title="Remove step">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        <input type="hidden" data-initial-kind value="{{ step.kind }}">
+        <input type="hidden" data-initial-task value="{{ step.task }}">
+        <input type="hidden" data-initial-action value="{{ step.action }}">
+      </div>
+      {% endfor %}
+    </div>
+    <div class="empty-state workflow-empty" data-empty-state>
+      {% if form_data.available_backups or form_data.available_rclone_tasks %}
+      No steps yet.
+      {% else %}
+      This job does not have any backups or Rclone tasks yet.
+      {% endif %}
+    </div>
+  </section>
+  {{ editor_groups(form_data.groups[1:]) }}
+  <div class="form-actions justify-between">
+    <div class="form-actions">
+      <button class="btn btn-primary">Save</button>
+      <a href="/config/jobs" class="btn btn-secondary">Cancel</a>
+    </div>
+    {% if not is_new %}
+    <button type="submit" form="delete-form" class="btn btn-danger btn-sm">
+      Delete
+    </button>
+    {% endif %}
+  </div>
+</form>
+<template id="workflow-step-template">
+  <div class="workflow-step-row" data-step-row>
+    <div class="workflow-step-index" data-step-index></div>
+    <div class="workflow-step-fields">
+      <label>
+        <span class="form-label">Type</span>
+        <select class="form-control" data-step-kind>
+          <option value="backup">Backup Task</option>
+          <option value="rclone">Rclone Task</option>
+        </select>
+      </label>
+      <label data-task-wrap>
+        <span class="form-label">Target</span>
+        <select class="form-control" data-step-task></select>
+      </label>
+      <label data-action-wrap>
+        <span class="form-label">Action</span>
+        <select class="form-control" data-step-action>
+          <option value="all">Backup plan</option>
+          <option value="backup">Backup Task</option>
+          <option value="retention">Retention Task</option>
+          <option value="cleanup">Cleanup Task</option>
+        </select>
+      </label>
+    </div>
+    <div class="workflow-step-actions">
+      <button type="button" class="btn btn-secondary btn-sm workflow-icon-btn" data-move-up aria-label="Move step up" title="Move step up">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+      </button>
+      <button type="button" class="btn btn-secondary btn-sm workflow-icon-btn" data-move-down aria-label="Move step down" title="Move step down">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <button type="button" class="btn btn-danger btn-sm workflow-icon-btn" data-remove-step aria-label="Remove step" title="Remove step">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </div>
+</template>
+<script id="workflow-editor-data" type="application/json">
+  {{ {"backups": form_data.available_backups | default([]), "rcloneTasks": form_data.available_rclone_tasks | default([])} | tojson }}
+</script>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/config-editor-form.js') }}?v={{ asset_version }}" defer></script>
+<script src="{{ url_for('static', path='/js/workflow-editor.js') }}?v={{ asset_version }}" defer></script>
+{% endblock %}

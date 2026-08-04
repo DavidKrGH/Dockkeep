@@ -1,0 +1,61 @@
+{% from "_macros.html" import run_task %}
+<div
+  id="runs-active-region"
+  hx-get="{{ fragment_url }}"
+  hx-trigger="run-status-changed from:body, every 10s [document.visibilityState=='visible']"
+  hx-swap="outerHTML"
+  class="mb-5"
+>
+  <div class="panel list-panel">
+    <div class="panel-header list-header">
+      <div>
+        <span class="list-title">Active runs</span>
+        <span class="list-subtitle">{{ active_runs | length }} running or queued</span>
+      </div>
+    </div>
+    {% if not scheduler_available %}
+    <div class="alert alert-warning mx-4 mt-4">
+      Scheduler runs are currently unavailable.
+    </div>
+    {% endif %}
+    {% if not active_runs %}
+    <div class="empty-state-inline">No active runs.</div>
+    {% else %}
+    <div class="list-scroll">
+      <table class="data-table list-table">
+        <thead>
+          <tr>
+            <th class="runs-status-col">Status</th>
+            <th>Task</th>
+            <th>Source</th>
+            <th>Started</th>
+            <th>Duration</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in active_runs %}
+          <tr>
+            <td class="runs-status-col">{% set hide_run_action = true %}{% include "fragments/run_status.html" %}</td>
+            <td>{{ run_task(run, compact=true) }}</td>
+            <td><span class="badge badge-neutral">{{ run.origin_label or run.origin or "—" }}</span></td>
+            <td class="list-cell-time">{{ (run.started_at or run.created_at) | format_datetime(seconds=true) }}</td>
+            <td class="list-cell-muted">{{ run.duration_seconds | format_duration }}</td>
+            <td class="text-right">
+              <div class="list-actions">
+                {% if run.detail_url %}
+                <a href="{{ run.detail_url }}" class="btn btn-secondary btn-sm">Details</a>
+                {% endif %}
+                {% if run.task_kind != "restore" and run.logs_url %}
+                <a href="{{ run.logs_url }}" class="btn btn-secondary btn-sm">Logs</a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% from "_macros.html" import alert_error, alert_success, alert_warning, page_header %}
+{% block title %}Config — Dockkeep{% endblock %}
+
+{% block content %}
+{{ config_tabs("raw_config") }}
+
+{{ page_header(
+  "config.toml",
+  "Edit raw TOML and save after validation.",
+  [
+    {"label": "Configuration", "href": "/config/jobs"},
+    {"label": "Raw config"}
+  ]
+) }}
+
+{{ alert_error(error) }}
+{{ alert_success(success) }}
+{{ alert_warning(warnings) }}
+
+<form id="config-form" action="/config/raw/save" method="post">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="text-xs font-medium text-slate-500 dark:text-slate-400">TOML</span>
+      <button type="submit"
+              class="btn btn-primary btn-sm">
+        Save &amp; validate
+      </button>
+    </div>
+    <textarea id="toml-content" name="content" class="admin-code-editor font-mono text-sm"
+              data-plain-editor data-editor-form="config-form" data-editor-mode="toml">{{ content }}</textarea>
+  </div>
+</form>
+
+<p class="mt-3 text-xs text-slate-400 dark:text-slate-500">
+  Saving validates the config first; if there are errors, nothing is saved.
+</p>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/raw-config-editor.js') }}?v={{ asset_version }}"></script>
+<script src="{{ url_for('static', path='/js/editor-init.js') }}?v={{ asset_version }}"></script>
+{% endblock %}

@@ -1,0 +1,681 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block title %}Help - Dockkeep{% endblock %}
+
+{% block content %}
+{{ page_header("Help", "How to set up jobs, run them, restore data, and read what Dockkeep records.") }}
+
+<div class="help-table-wrap help-index">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>I want to...</th>
+        <th>Go to</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Set up the very first backup</td>
+        <td>Configuration (<a class="text-link" href="#start">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Start a backup, Rclone task, or workflow now</td>
+        <td>Dashboard, <span class="help-label">Start</span> or <span class="help-label">Dry Run</span> in the task row</td>
+      </tr>
+      <tr>
+        <td>See what is running and what already ran</td>
+        <td>Runs (<a class="text-link" href="#runs">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Cancel a running job or restore</td>
+        <td>Runs, <span class="help-label">Cancel</span> on the active run</td>
+      </tr>
+      <tr>
+        <td>Change schedules, sources, retention, credentials</td>
+        <td>Configuration -&gt; Jobs (<a class="text-link" href="#config">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Understand where a value comes from</td>
+        <td>Job sidebar -&gt; <span class="help-label">Effective config</span> (<a class="text-link" href="#inheritance">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Edit the configuration file directly</td>
+        <td>Configuration -&gt; Jobs -&gt; <span class="help-label">Raw config</span></td>
+      </tr>
+      <tr>
+        <td>Copy or sync data to a remote</td>
+        <td>Configuration -&gt; Jobs (<a class="text-link" href="#rclone">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Restore files from a snapshot</td>
+        <td>Repositories (<a class="text-link" href="#restore">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Read or follow logs</td>
+        <td>Diagnostics -&gt; Logs (<a class="text-link" href="#logs">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Set up mail or Pushover notifications</td>
+        <td>Configuration -&gt; Jobs -&gt; Global settings (<a class="text-link" href="#notifications">details</a>)</td>
+      </tr>
+      <tr>
+        <td>Manage Rclone remotes</td>
+        <td>Configuration -&gt; Rclone remotes</td>
+      </tr>
+      <tr>
+        <td>Run <code>restic</code> or <code>rclone</code> by hand</td>
+        <td>Container shell (<a class="text-link" href="#shell">details</a>)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="help-layout">
+  <nav class="help-toc" aria-label="Help sections">
+    <a class="help-toc-link" href="#start">First steps</a>
+    <a class="help-toc-link" href="#config">Configuration</a>
+    <a class="help-toc-link" href="#inheritance">Inheritance</a>
+    <a class="help-toc-link" href="#rclone">Rclone tasks</a>
+    <a class="help-toc-link" href="#runs">Runs</a>
+    <a class="help-toc-link" href="#restore">Restore</a>
+    <a class="help-toc-link" href="#repositories">Repositories</a>
+    <a class="help-toc-link" href="#logs">Logs</a>
+    <a class="help-toc-link" href="#notifications">Notifications</a>
+    <a class="help-toc-link" href="#hooks">Hooks</a>
+    <span class="help-toc-divider">Reference</span>
+    <a class="help-toc-link" href="#shell">Restic and Rclone</a>
+    <a class="help-toc-link" href="#targets">Target names</a>
+    <a class="help-toc-link" href="#paths">Paths and environment</a>
+  </nav>
+
+  <div class="help-content">
+  <section id="start" class="panel panel-body help-section">
+    <h2 class="help-section-title">First steps: from empty config to first backup</h2>
+    <p class="help-copy">
+      Dockkeep runs Restic backups and optional Rclone syncs for jobs you define once and then schedule.
+      A fresh installation starts with an empty configuration, so the first backup is roughly six steps.
+    </p>
+    <ol class="help-steps">
+      <li>
+        <strong>Create a job.</strong> Configuration -&gt; Jobs, then
+        <span class="help-label">+ Create new job</span>. A job groups backups, Rclone tasks, and workflows
+        that belong together and share defaults.
+      </li>
+      <li>
+        <strong>Add a backup.</strong> In the job sidebar choose <span class="help-label">+ New backup</span>
+        and fill in the repository, the repository password, and the source paths to back up. Set a schedule if
+        it should run automatically, and retention if old snapshots should be pruned.
+      </li>
+      <li>
+        <strong>Optional: add Rclone tasks and workflows.</strong>
+        <span class="help-label">+ New Rclone task</span> copies or syncs data to a remote,
+        <span class="help-label">+ New workflow</span> chains several steps into one run.
+      </li>
+      <li>
+        <strong>Check the result.</strong> <span class="help-label">Effective config</span> in the job sidebar
+        shows the values that will actually be used, including everything inherited from job and global level.
+      </li>
+      <li>
+        <strong>Try it.</strong> On the Dashboard, use <span class="help-label">Dry Run</span> on the new backup
+        first - it exercises the whole path without writing a snapshot. If that looks right, use
+        <span class="help-label">Start</span>.
+      </li>
+      <li>
+        <strong>Watch it.</strong> The Runs panel on the Dashboard and the Runs page show the run; Diagnostics
+        -&gt; Logs shows its output line by line. After the first successful backup, the Repositories page
+        starts showing snapshots.
+      </li>
+    </ol>
+  </section>
+
+  <section id="config" class="panel panel-body help-section">
+    <h2 class="help-section-title">Creating and editing the configuration</h2>
+    <p class="help-copy">
+      Everything lives in a single <code>config.toml</code>. The structured editor writes it for you and keeps
+      your comments, blank lines, and formatting intact outside the values you actually change.
+    </p>
+    <div class="help-card-grid">
+      <div class="help-card">
+        <h3>Global settings</h3>
+        <p>Collapsible section on Configuration -&gt; Jobs. Holds defaults for all jobs, log level and log
+          retention, and the notification providers.</p>
+      </div>
+      <div class="help-card">
+        <h3>Job pages</h3>
+        <p>The job sidebar has <span class="help-label">Job settings</span>,
+          <span class="help-label">Backup defaults</span>, <span class="help-label">Rclone defaults</span>, and
+          one page per backup, Rclone task, and workflow, plus
+          <span class="help-label">Effective config</span>.</p>
+      </div>
+      <div class="help-card">
+        <h3>Raw config</h3>
+        <p>The <span class="help-label">Raw config</span> button opens the TOML file itself - useful for bulk
+          edits and for anything the structured forms do not cover. It validates before saving.</p>
+      </div>
+      <div class="help-card">
+        <h3>Rclone remotes</h3>
+        <p>Configuration -&gt; Rclone remotes creates, edits, tests, and deletes remotes in
+          <code>rclone.conf</code>, with a raw editor for remote types the form does not cover.</p>
+      </div>
+    </div>
+    <dl class="help-definition-list">
+      <div>
+        <dt>Names</dt>
+        <dd>Jobs, backups, Rclone tasks, and workflows may contain letters, digits, hyphens, and underscores -
+          no dots, spaces, or other characters, because dots separate the parts of a
+          <a class="text-link" href="#targets">target name</a>. <code>new</code> cannot be used as a name in
+          the editor, and <code>_system</code> is reserved as a job name because it is the system log
+          directory.</dd>
+      </div>
+      <div>
+        <dt>Repository credentials</dt>
+        <dd>Set exactly one of password, password environment variable, or password file - per level they are
+          mutually exclusive. A password file must be an absolute path that exists when the configuration is
+          loaded.</dd>
+      </div>
+      <div>
+        <dt>Schedules</dt>
+        <dd>A schedule is a cron expression with exactly five fields
+          (<code>minute hour day month weekday</code>), so <code>0 2 * * *</code> is daily at 02:00 and
+          <code>*/30 * * * *</code> every 30 minutes. The field previews the next runs while you type. All
+          schedules and every next-run time in the UI use the container's local time - check it if runs happen
+          an hour off. Without a schedule a task runs only when you start it.</dd>
+      </div>
+      <div>
+        <dt>Workflows</dt>
+        <dd>Built from steps you pick as type, target, and action. <span class="help-label">Backup plan</span>
+          runs the backup with its configured retention and cleanup options; the forced actions run only that
+          single step. The first failing step aborts the workflow.</dd>
+      </div>
+      <div>
+        <dt>Saved changes take effect on their own</dt>
+        <dd>The scheduler notices a changed configuration and picks it up on its next check, so schedules do not
+          need a restart. If a saved configuration is invalid, the last valid one stays active and the error
+          remains visible until a valid save replaces it.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section id="inheritance" class="panel panel-body help-section">
+    <h2 class="help-section-title">How settings inherit</h2>
+    <p class="help-copy">
+      Most settings exist on three levels and fall through from top to bottom:
+      <strong>global -&gt; job -&gt; backup, workflow, or Rclone task</strong>. This is why a backup page can
+      look almost empty and still do the right thing - and why <span class="help-label">Effective config</span>
+      in the job sidebar is the page to check when a value surprises you: it shows the resolved result after
+      inheritance.
+    </p>
+    <dl class="help-definition-list">
+      <div>
+        <dt>Not set</dt>
+        <dd>Inherits the value from the level above. This is the normal case and what an empty field means.</dd>
+      </div>
+      <div>
+        <dt>Explicit value</dt>
+        <dd>Overrides the inherited value for this level and everything below it.</dd>
+      </div>
+      <div>
+        <dt>Explicit off</dt>
+        <dd>A switch set to false stops inheritance - it does not fall back to an enabled parent value.</dd>
+      </div>
+      <div>
+        <dt>Extra arguments</dt>
+        <dd>An empty list is not the same as unset: it stops inheritance and passes no extra arguments at all.</dd>
+      </div>
+      <div>
+        <dt>Timeouts and retention</dt>
+        <dd>Backup, Rclone, and hook timeouts as well as the Restic keep rules inherit the same way. No
+          effective timeout means the command may run without a time limit.</dd>
+      </div>
+      <div>
+        <dt>Not inherited</dt>
+        <dd>Lock retry settings, the report schedule, and the per-provider event list exist only globally. The
+          schedule of an Rclone task is set on the task itself and is never inherited from the job.</dd>
+      </div>
+    </dl>
+    <p class="help-copy">
+      Retention needs at least one effective keep rule as soon as it is switched on or a workflow runs a
+      retention step - otherwise the configuration is rejected. A backup without any source paths is allowed
+      but reported as a warning.
+    </p>
+  </section>
+
+  <section id="rclone" class="panel panel-body help-section">
+    <h2 class="help-section-title">Rclone tasks: copy and sync</h2>
+    <p class="help-copy">
+      An Rclone task moves a local directory to a remote - typically the Restic repository itself, so a copy of
+      the backup lives off-site. The remote must exist in <code>rclone.conf</code>; create and test it under
+      Configuration -&gt; Rclone remotes. A task pointing at an unknown remote fails immediately.
+    </p>
+    <dl class="help-definition-list">
+      <div>
+        <dt>Copy (default)</dt>
+        <dd>With <span class="help-label">Delete during sync</span> off, Dockkeep runs <code>rclone copy</code>:
+          new and changed files are uploaded, nothing on the target is ever deleted. Files removed locally stay
+          on the remote.</dd>
+      </div>
+      <div>
+        <dt>Sync</dt>
+        <dd>With <span class="help-label">Delete during sync</span> on, Dockkeep runs <code>rclone sync</code>
+          and the target mirrors the source - including deletions. Use it only when the remote is meant to be a
+          mirror, not an archive.</dd>
+      </div>
+      <div>
+        <dt>Deletion guard</dt>
+        <dd>A deleting sync refuses to start when the local source is missing, not a directory, empty, or
+          unreadable; the run fails and names the source in the log instead of clearing the remote. An
+          unmounted volume therefore cannot wipe the target.</dd>
+      </div>
+      <div>
+        <dt>Own schedule</dt>
+        <dd>An Rclone task is scheduled on the task page itself. Everything else (bandwidth limit, transfers,
+          checkers, extra arguments, timeouts, notifications) inherits from job and global level as usual.</dd>
+      </div>
+    </dl>
+    <p class="help-copy">
+      To upload a repository right after the backup that filled it, put both into a workflow instead of giving
+      them two schedules - it keeps the order and stops at the first failing step.
+    </p>
+  </section>
+
+  <section id="runs" class="panel panel-body help-section">
+    <h2 class="help-section-title">Running jobs and reading run status</h2>
+    <p class="help-copy">
+      Every backup, Rclone task, workflow, and restore becomes a run. Start one manually with
+      <span class="help-label">Start</span> or <span class="help-label">Dry Run</span> on the Dashboard, or let
+      the scheduler start it. The Dashboard Runs panel shows active, upcoming, and recent runs; the Runs page
+      adds the full history with filters for job, task, status, and source, plus
+      <span class="help-label">Details</span>, <span class="help-label">Logs</span>, and
+      <span class="help-label">Cancel</span>.
+    </p>
+    <p class="help-copy">
+      A dry run exercises the whole path but tells Restic and Rclone not to change anything. Configured hooks
+      are skipped in a dry run; a missing repository may still be initialised if auto-init is on.
+    </p>
+    <h3 class="help-subtitle mt-4">What the statuses mean</h3>
+    <dl class="help-definition-list">
+      <div>
+        <dt>Queued</dt>
+        <dd>Accepted and about to start. Cancelling here ends the run before any command is executed.</dd>
+      </div>
+      <div>
+        <dt>Running</dt>
+        <dd>A command is being executed. Cancelling stops it and its child processes.</dd>
+      </div>
+      <div>
+        <dt>Success</dt>
+        <dd>All steps finished successfully.</dd>
+      </div>
+      <div>
+        <dt>Failed</dt>
+        <dd>A step failed. For workflows, the run stopped at the first failing step.</dd>
+      </div>
+      <div>
+        <dt>Skipped</dt>
+        <dd>A scheduled run could not get its resource lock because the same repository or Rclone endpoint was
+          busy. The run was not started; the next schedule applies as usual.</dd>
+      </div>
+      <div>
+        <dt>Lock error</dt>
+        <dd>Same cause as skipped, but for a run you started manually - so it is reported as an error rather
+          than silently passed over.</dd>
+      </div>
+      <div>
+        <dt>Cancelled</dt>
+        <dd>Cancelled from the UI. No further steps, no error hooks, and no notification follow.</dd>
+      </div>
+      <div>
+        <dt>Config error</dt>
+        <dd>The configuration could not be loaded or is invalid for this target.</dd>
+      </div>
+      <div>
+        <dt>Unexpected error</dt>
+        <dd>An error outside the normal failure paths. The full stack trace is in the log.</dd>
+      </div>
+    </dl>
+    <h3 class="help-subtitle mt-4">Why runs wait for each other</h3>
+    <p class="help-copy">
+      Runs lock the resources they touch - the Restic repository, the Rclone source and target - so the same
+      repository is never written by two runs at once. A workflow holds the resources of all its steps for its
+      entire runtime.
+    </p>
+    <p class="help-copy">
+      A lock is never waited on indefinitely: a conflict ends the run immediately as skipped or lock error,
+      unless the global lock retry settings allow a few more attempts.
+    </p>
+    <p class="help-copy">
+      Starting the same target manually while it is already running does not create a second run - you get the
+      running one back.
+    </p>
+    <p class="help-copy">
+      After the last step, a run stays in <span class="help-label">Running</span> for a moment while snapshot
+      and size data are read from the repository. During this phase it can no longer be cancelled.
+      Notifications are sent afterwards.
+    </p>
+    <h3 class="help-subtitle mt-4">The scheduler</h3>
+    <p class="help-copy">
+      Scheduled runs need an active scheduler; in this container it belongs to the web UI process. It checks
+      once a minute which schedule is due, uses the container's local time, and picks up a saved configuration
+      change on its next check.
+    </p>
+    <p class="help-copy">
+      If the Runs page shows that scheduler runs are unavailable, no scheduler is reachable and the page lists
+      manual runs only. The usual cause is a missing or invalid configuration: the UI then starts in
+      <a class="text-link" href="#paths">recovery mode</a> and the scheduler stays inactive until a valid
+      configuration is saved.
+    </p>
+  </section>
+
+  <section id="restore" class="panel panel-body help-section">
+    <h2 class="help-section-title">Restoring data</h2>
+    <ol class="help-steps">
+      <li>
+        Open <strong>Repositories</strong> and pick the location you want to restore from, then
+        <span class="help-label">Snapshots</span>.
+      </li>
+      <li>
+        Choose the snapshot and open its <span class="help-label">Restore</span> page.
+      </li>
+      <li>
+        Pick a mode. <strong>Whole snapshot</strong> restores everything and optionally narrows the result with
+        either include patterns or exclude patterns - the two cannot be combined.
+        <strong>Select files and folders</strong> browses the snapshot contents and restores exactly what you
+        tick, without mounting the repository.
+      </li>
+      <li>
+        Optionally set a target directory and decide whether existing files may be overwritten.
+      </li>
+      <li>
+        Use <span class="help-label">Run dry-run</span> first: it reports what would be restored without
+        writing anything. Then <span class="help-label">Start restore</span>.
+      </li>
+      <li>
+        The restore shows its progress on the page and appears on the Runs page like any other run. It can be
+        cancelled while it is still running.
+      </li>
+    </ol>
+    <p class="help-copy">
+      Without a target, files land in
+      <code>/restore/&lt;job&gt;/&lt;backup&gt;/&lt;YYYY-MM-DD_HH-MM-SS&gt;_&lt;snapshot&gt;_&lt;suffix&gt;</code>, so a
+      second restore of the same snapshot never overwrites the first. Restores are always confined to the
+      restore base directory <code>/restore</code>; a target outside it is rejected, and so are symlinked path
+      components inside it.
+    </p>
+    <p class="help-copy">
+      If no configured backup holds credentials for that location any more - for example after the backup was
+      removed from the configuration - the restore page asks for <strong>ad-hoc credentials</strong>. They are
+      used for this one request only and are never written to the configuration or stored anywhere.
+    </p>
+  </section>
+
+  <section id="repositories" class="panel panel-body help-section">
+    <h2 class="help-section-title">Repositories, snapshots, and refresh</h2>
+    <p class="help-copy">
+      The Repositories page groups by the physical Restic repository, not by configuration: several backups
+      pointing at the same repository appear as one card with one row per storage location. Each row shows the
+      configuration currently pointing at it, or <span class="help-label">Inactive</span> if none does.
+    </p>
+    <p class="help-copy">
+      Snapshot lists, sizes, and the growth chart come from Dockkeep's own cache, which is filled while jobs
+      run: a successful backup records the new snapshot and repository size, a retention step reconciles the
+      full snapshot list, a cleanup step records the size again. That is why the page stays fast and works
+      without contacting the repository.
+    </p>
+    <p class="help-copy">
+      Use <span class="help-label">Refresh</span> when the repository changed outside Dockkeep - the button on
+      the page refreshes every configured backup, the one on a location refreshes just that location. Locations
+      that no longer have an active configuration can be <span class="help-label">merged</span> into another
+      location (when a repository moved) or deleted from the overview; this only touches the cache, never the
+      repository or <code>config.toml</code>.
+    </p>
+  </section>
+
+  <section id="logs" class="panel panel-body help-section">
+    <h2 class="help-section-title">Logs and diagnostics</h2>
+    <p class="help-copy">
+      Diagnostics -&gt; Logs shows one job and one day at a time. Level buttons, the task filter, and the
+      search box narrow down what is displayed. The <span class="help-label">_system</span> entry in the job
+      list holds everything that does not belong to a job run - scheduler, configuration loading, the web UI
+      itself.
+    </p>
+    <p class="help-copy">
+      The static view is a snapshot of the moment you opened it. To follow a running job, use
+      <span class="help-label">Live</span>; it streams new lines until you press
+      <span class="help-label">Stop</span>.
+    </p>
+    <p class="help-copy">
+      Log lines follow a fixed format - the date is already in the file name, so the line starts with the
+      time:
+    </p>
+    <pre class="help-code"><code>14:03:12 [INFO] [nas] [backup.local] Starting backup
+14:03:12 [INFO] [restic] [workflow.nightly &rsaquo; backup.local] Running restic backup</code></pre>
+    <p class="help-note">
+      The second tag says who wrote the line: the job name for the run itself, the component for output coming
+      from Restic, Rclone, or a hook. The last tag is the task the line belongs to, which is what the task
+      filter matches - steps inside a workflow are shown nested. Lines without a timestamp, such as stack
+      traces, belong to the line above and are filtered with it.
+    </p>
+    <p class="help-copy">
+      Diagnostics -&gt; Database is a read-only view of Dockkeep's own SQLite database (run history, restore
+      records, repository artifacts, statistics). It exists for checking what was recorded; it cannot change
+      anything and takes no free-form SQL.
+    </p>
+  </section>
+
+  <section id="notifications" class="panel panel-body help-section">
+    <h2 class="help-section-title">Notifications and reports</h2>
+    <p class="help-copy">
+      Providers are configured in the global section of Configuration -&gt; Jobs and are active as soon as
+      their section exists and is valid - there is no separate enable switch.
+      <span class="help-label">Test provider</span> sends a single test notification,
+      <span class="help-label">Test report</span> sends a synthetic periodic report.
+    </p>
+    <p class="help-copy">
+      Which events a task triggers comes from its notify-on-success, notify-on-error, and notify-on-skipped
+      settings, inherited global -&gt; job -&gt; task. The optional event list per provider only narrows that
+      down; it can never produce an event the task does not trigger. Notify-on-error covers every failing
+      status, cancelled runs never notify.
+    </p>
+    <p class="help-copy">
+      An optional global report schedule sends a periodic summary of finished runs. It is evaluated by the
+      scheduler, and the summary covers the last complete interval; empty windows are still sent as a
+      heartbeat so a silent channel is recognisable as a problem.
+    </p>
+  </section>
+
+  <section id="hooks" class="panel panel-body help-section">
+    <h2 class="help-section-title">Hooks</h2>
+    <p class="help-copy">
+      Pre, post, and on-error hooks can run around a job and around a single backup or workflow - for example
+      to stop a container before the backup and start it afterwards. Both levels are independent: if a backup
+      fails, first its own on-error hooks run, then the job's.
+    </p>
+    <dl class="help-definition-list">
+      <div>
+        <dt>Failure handling</dt>
+        <dd>A failing pre or on-error hook aborts the run. A failing post hook only logs a warning and leaves
+          the result successful.</dd>
+      </div>
+      <div>
+        <dt>Script hooks</dt>
+        <dd>Must be absolute paths inside <code>/scripts</code> and run directly from there, so the script has
+          to be executable. Arguments after the path are passed through without a shell.</dd>
+      </div>
+      <div>
+        <dt>Inline commands</dt>
+        <dd>Shell one-liners instead of a script file. They run only if <code>DK_ALLOW_INLINE_HOOKS=true</code>
+          is set on the container.</dd>
+      </div>
+      <div>
+        <dt>Dry runs</dt>
+        <dd>Configured hooks are not executed in a dry run.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section id="shell" class="panel panel-body help-section">
+    <h2 class="help-section-title">Running Restic and Rclone commands by hand</h2>
+    <p class="help-copy">
+      Some maintenance has no button in the UI - checking a repository, unlocking it after a crash, comparing
+      a remote. For that, open a shell in the container and let <code>dk shell</code> prepare the environment
+      for a configured target; then use <code>restic</code> and <code>rclone</code> natively.
+    </p>
+    <div class="help-command-grid">
+      <div>
+        <h3 class="help-subtitle">Open a shell</h3>
+        <pre class="help-code"><code>docker exec -it &lt;container-name&gt; bash
+docker compose exec &lt;service-name&gt; bash</code></pre>
+        <p class="help-note">
+          <code>&lt;container-name&gt;</code> comes from <code>docker ps</code>,
+          <code>&lt;service-name&gt;</code> from your Compose file.
+        </p>
+      </div>
+      <div>
+        <h3 class="help-subtitle">Prepared Restic shell</h3>
+        <pre class="help-code"><code>dk shell &lt;job&gt;.backup.&lt;backup&gt;
+restic snapshots
+restic check
+restic unlock</code></pre>
+        <p class="help-note">
+          Sets <code>RESTIC_REPOSITORY</code> and, depending on the configuration,
+          <code>RESTIC_PASSWORD</code> or <code>RESTIC_PASSWORD_FILE</code>.
+        </p>
+      </div>
+      <div>
+        <h3 class="help-subtitle">Prepared Rclone shell</h3>
+        <pre class="help-code"><code>dk shell &lt;job&gt;.rclone.&lt;task&gt;
+rclone ls &lt;target&gt;
+rclone check &lt;source&gt; &lt;target&gt;</code></pre>
+        <p class="help-note">
+          Shows the configured source and target. The active <code>rclone.conf</code> is the one from
+          <code>RCLONE_CONFIG</code>, normally <code>/config/rclone.conf</code>.
+        </p>
+      </div>
+      <div>
+        <h3 class="help-subtitle">Find targets and check the config</h3>
+        <pre class="help-code"><code>dk shell
+dk shell &lt;job&gt;
+dk config validate</code></pre>
+        <p class="help-note">
+          Without a complete target, <code>dk shell</code> lists what is available.
+          <code>dk config validate</code> checks the configuration file without changing anything and also
+          works while the UI is in recovery mode.
+        </p>
+      </div>
+    </div>
+    <div class="alert mt-4">
+      <strong>Only these two commands work here.</strong> This container runs in UI mode, where the web UI is
+      the place to start, schedule, and inspect runs - so <code>dk shell</code> and
+      <code>dk config validate</code> are available and all other <code>dk</code> commands refuse to run and
+      point back to the UI.
+    </div>
+  </section>
+
+  <section id="targets" class="panel panel-body help-section">
+    <h2 class="help-section-title">Target names</h2>
+    <p class="help-copy">
+      A target names one configured thing. You need this notation for <code>dk shell</code> and when editing
+      the raw TOML; the structured workflow editor picks type, target, and action from dropdowns instead.
+    </p>
+    <pre class="help-code"><code>&lt;job&gt;.backup.&lt;backup&gt;
+&lt;job&gt;.backup.&lt;backup&gt;.backup
+&lt;job&gt;.backup.&lt;backup&gt;.retention
+&lt;job&gt;.backup.&lt;backup&gt;.cleanup
+&lt;job&gt;.rclone.&lt;task&gt;
+&lt;job&gt;.workflow.&lt;workflow&gt;</code></pre>
+    <p class="help-note">
+      The three suffixed forms address a single step of a backup instead of the whole plan: only the snapshot,
+      only retention, or only cleanup.
+    </p>
+  </section>
+
+  <section id="paths" class="panel panel-body help-section">
+    <h2 class="help-section-title">Paths and environment settings</h2>
+    <p class="help-copy">
+      These are the container paths in their default layout. If you changed the corresponding environment
+      variable, the path changes with it.
+    </p>
+    <dl class="help-definition-list">
+      <div>
+        <dt>Config</dt>
+        <dd><code>/config/config.toml</code>; directory override <code>DK_CONFIG_DIR</code></dd>
+      </div>
+      <div>
+        <dt>Rclone config</dt>
+        <dd><code>/config/rclone.conf</code>; override <code>RCLONE_CONFIG</code></dd>
+      </div>
+      <div>
+        <dt>Backups</dt>
+        <dd><code>/backups</code> is the directory the container prepares for local Restic repositories - a
+          repository path is whatever you configure, this is only the intended mount point; override
+          <code>DK_BACKUP_DIR</code></dd>
+      </div>
+      <div>
+        <dt>Logs</dt>
+        <dd>Job logs <code>/logs/&lt;job&gt;/&lt;YYYY-MM-DD&gt;.log</code>, system logs
+          <code>/logs/_system/&lt;YYYY-MM-DD&gt;.log</code>; override <code>DK_LOG_DIR</code></dd>
+      </div>
+      <div>
+        <dt>AppData</dt>
+        <dd><code>/appdata</code> holds <code>appdata.db</code> with run history, restore records, repository
+          data, and statistics; override <code>DK_APPDATA_DIR</code></dd>
+      </div>
+      <div>
+        <dt>Restore</dt>
+        <dd><code>/restore</code>; restores only ever write below this directory; override
+          <code>DK_RESTORE_DIR</code></dd>
+      </div>
+      <div>
+        <dt>Hook scripts</dt>
+        <dd><code>/scripts</code> is the working directory for hooks and the only allowed location for script
+          hooks; override <code>DK_SCRIPTS_DIR</code></dd>
+      </div>
+      <div>
+        <dt>Locks</dt>
+        <dd><code>/var/lock</code> for resource locks and the scheduler lock; override
+          <code>DK_LOCK_DIR</code></dd>
+      </div>
+    </dl>
+    <h3 class="help-subtitle mt-4">Settings that exist only as environment variables</h3>
+    <p class="help-copy">
+      These have no field in the UI on purpose - they belong to the container, not to the configuration file.
+    </p>
+    <dl class="help-definition-list">
+      <div>
+        <dt>DK_APPDATA_RETENTION_DAYS<br>DK_APPDATA_RETENTION_COUNT</dt>
+        <dd>Maximum age in days and maximum number of entries kept in <code>appdata.db</code>. If neither is
+          set, nothing is ever deleted automatically and the database keeps growing - set at least one on a
+          long-running installation. Active runs and data still in use are never removed.</dd>
+      </div>
+      <div>
+        <dt>DK_ALLOW_INLINE_HOOKS</dt>
+        <dd>Set to <code>true</code> to allow inline shell commands as hooks; otherwise only script files
+          inside <code>/scripts</code> run.</dd>
+      </div>
+      <div>
+        <dt>DK_STATS_TIMEOUT<br>DK_BROWSE_TIMEOUT</dt>
+        <dd>Time limit for reading repository statistics after a run (default 600 s) and for listing snapshot
+          contents in the restore browser (default 30 s). Raise them for very large or slow repositories - a
+          timeout names the variable in the log.</dd>
+      </div>
+      <div>
+        <dt>DK_NOTIFICATION_TIMEOUT</dt>
+        <dd>Time limit for sending one notification (default 10 s).</dd>
+      </div>
+      <div>
+        <dt>DK_SIGTERM_GRACE_PERIOD</dt>
+        <dd>Seconds a cancelled or timed-out command may shut down cleanly before it is killed (default
+          10 s).</dd>
+      </div>
+    </dl>
+    <p class="help-copy">
+      <strong>Recovery mode:</strong> if the configuration is missing or invalid, the UI still starts so you
+      can fix it. The scheduler stays inactive until a valid configuration is saved.
+    </p>
+    <p class="help-copy">
+      <strong>The UI has no login.</strong> Do not expose it to an untrusted network.
+    </p>
+  </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,75 @@
+{% from "_macros.html" import run_task, status_badge %}
+<div
+  id="dashboard-runs-panel"
+  class="mb-6 panel list-panel"
+  hx-get="/dashboard/runs"
+  hx-trigger="run-status-changed from:body, every 10s [document.visibilityState=='visible']"
+  hx-swap="outerHTML"
+>
+  <div class="panel-header list-header">
+    <span class="list-title">Runs</span>
+    <span class="flex items-center gap-x-4">
+      <a href="/runs" class="text-link text-xs">History →</a>
+    </span>
+  </div>
+  <div class="list-scroll">
+    <table class="data-table list-table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Target</th>
+          <th>Source</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if active_runs %}
+        <tr class="list-section-row">
+          <td colspan="4">Active</td>
+        </tr>
+        {% for run in active_runs %}
+        <tr>
+          <td>{% include "fragments/run_status.html" %}</td>
+          <td>{{ run_task(run, link_url=run.detail_url, compact=true) }}</td>
+          <td><span class="badge badge-neutral">{{ run.origin_label or run.origin or "—" }}</span></td>
+          <td class="list-cell-time">{{ (run.started_at or run.created_at) | format_datetime(seconds=true) }}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+        <tr class="list-section-row">
+          <td colspan="4">Upcoming</td>
+        </tr>
+        {% for run in upcoming_runs %}
+        <tr>
+          <td><span class="badge badge-neutral">Scheduled</span></td>
+          <td>{{ run_task(run, compact=true) }}</td>
+          <td><span class="badge badge-neutral">{{ run.schedule }}</span></td>
+          <td class="list-cell-time">
+            {{ run.next_run | relative_time }}
+            <div class="list-cell-muted">{{ run.next_run | format_datetime }}</div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="list-empty-row">No scheduled runs active.</td>
+        </tr>
+        {% endfor %}
+        <tr class="list-section-row">
+          <td colspan="4">Recent</td>
+        </tr>
+        {% for run in recent_runs %}
+        <tr>
+          <td>{{ status_badge(run.status, run.status_label, run.status_tone) }}</td>
+          <td>{{ run_task(run, link_url=run.detail_url, compact=true) }}</td>
+          <td><span class="badge badge-neutral">{{ run.origin_label or run.origin or "—" }}</span></td>
+          <td class="list-cell-time">{{ run.finished_at | relative_time }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="list-empty-row">No completed runs recorded yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

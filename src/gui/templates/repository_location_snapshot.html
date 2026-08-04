@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
+{% block title %}Repository Snapshot - Dockkeep{% endblock %}
+
+{% block content %}
+{% call page_header(
+  "View snapshot",
+  repository,
+  [
+    {"label": "Repositories", "href": "/repositories"},
+    {"label": label, "href": "/repositories/locations/" ~ location_id ~ "/snapshots"},
+    {"label": snapshot_id[:8]}
+  ],
+  subtitle_mono=true
+) %}
+  {% if is_active %}
+  <span class="badge badge-success">{{ label }}</span>
+  {% else %}
+  <span class="badge badge-neutral">{{ label }}</span>
+  {% endif %}
+  <a href="/repositories/locations/{{ location_id }}/snapshots/{{ snapshot_id }}/restore"
+     class="btn btn-primary btn-sm">Restore</a>
+{% endcall %}
+
+<div class="grid gap-5">
+  <section class="panel panel-body">
+    {% set _dur = snapshot.summary.get('total_duration') if snapshot and snapshot.summary else none %}
+    {% set _size = snapshot.summary.get('total_bytes_processed') if snapshot and snapshot.summary else none %}
+    <div class="snapshot-summary">
+      <div class="snapshot-summary-small-grid">
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Snapshot-ID</p>
+          <p class="snapshot-summary-value font-mono">{{ snapshot_id }}</p>
+        </div>
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Time</p>
+          <p class="snapshot-summary-value">{{ snapshot.time | format_datetime if snapshot else "–" }}</p>
+        </div>
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Duration</p>
+          <p class="snapshot-summary-value">
+            {% if _dur is not none %}
+              {% set ds = _dur | int %}
+              {% if ds >= 3600 %}{{ (ds // 3600) }}h {{ ((ds % 3600) // 60) }}m
+              {% elif ds >= 60 %}{{ ds // 60 }}m {{ ds % 60 }}s
+              {% else %}{{ ds }}s{% endif %}
+            {% else %}–{% endif %}
+          </p>
+        </div>
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Data processed</p>
+          <p class="snapshot-summary-value">{% if _size is not none %}{{ _size | format_bytes }}{% else %}–{% endif %}</p>
+        </div>
+      </div>
+      <div class="snapshot-summary-wide-grid">
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Repository</p>
+          <p class="snapshot-summary-value font-mono">{{ repository }}</p>
+        </div>
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Host</p>
+          <p class="snapshot-summary-value">{{ snapshot.hostname | default("–", true) if snapshot else "–" }}</p>
+        </div>
+        {% if snapshot and snapshot.tags %}
+        <div class="snapshot-summary-cell">
+          <p class="snapshot-summary-label">Tags</p>
+          <p class="snapshot-summary-tags">
+            {% for tag in snapshot.tags %}
+            <span class="badge badge-neutral mr-1">{{ tag }}</span>
+            {% endfor %}
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">Browse files</span>
+      <span id="repository-browser-loading"
+            class="repository-browser-loading htmx-indicator"
+            role="status"
+            aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span>Loading...</span>
+      </span>
+    </div>
+    <div id="repository-browser"
+         hx-get="{{ browse_url }}"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         hx-indicator="#repository-browser-loading">
+      <div class="p-6 text-sm text-slate-500 dark:text-slate-400">Loading snapshot content...</div>
+    </div>
+  </section>
+</div>
+{% endblock %}

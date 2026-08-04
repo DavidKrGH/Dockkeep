@@ -1,0 +1,7 @@
+{% from "_macros.html" import status_badge %}
+{{ status_badge(
+  restore.status | default("unknown"),
+  restore.status_label | default("Unknown status"),
+  restore.status_tone | default("slate"),
+  restore.is_active | default(false)
+) }}

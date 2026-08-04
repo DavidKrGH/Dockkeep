@@ -1,0 +1,15 @@
+{% macro config_tabs(active) %}
+<nav class="config-tabs" aria-label="Configuration sections">
+  <a href="/config/jobs"
+     class="config-tab {{ 'config-tab-active' if active == 'jobs' else '' }}"
+     {% if active == 'jobs' %}aria-current="page"{% endif %}>
+    Jobs
+  </a>
+  <span class="config-tabs-divider" role="separator" aria-orientation="vertical"></span>
+  <a href="/config/remotes"
+     class="config-tab {{ 'config-tab-active' if active == 'remotes' else '' }}"
+     {% if active == 'remotes' %}aria-current="page"{% endif %}>
+    Rclone remotes
+  </a>
+</nav>
+{% endmacro %}

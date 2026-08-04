@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_config_tabs.html" import config_tabs %}
+{% from "_macros.html" import alert_error, alert_success %}
+{% block title %}Rclone Raw — Dockkeep{% endblock %}
+
+{% block content %}
+{{ config_tabs("remotes") }}
+
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">rclone.conf</h1>
+    <p class="page-subtitle">Expert mode for imports, OAuth backends, and special cases.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/config/remotes" class="btn btn-secondary btn-sm">Schema editor</a>
+  </div>
+</div>
+
+{{ alert_error(error) }}
+{{ alert_success(success) }}
+
+<div class="alert alert-warning mb-4">
+  For Google Drive, OneDrive, Dropbox, and similar OAuth backends, please keep using
+  <code class="font-mono">rclone config</code> in the terminal and import the resulting config here.
+</div>
+
+<form id="rclone-form" action="/config/remotes/raw/save" method="post">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
+        {% if conf_missing %}
+          New file at <code class="font-mono">{{ conf_path }}</code>
+        {% else %}
+          <span class="font-mono">{{ conf_path }}</span>
+        {% endif %}
+      </span>
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </div>
+    <textarea id="rclone-content" name="content" class="admin-code-editor font-mono text-sm"
+              data-plain-editor data-editor-form="rclone-form" data-editor-mode="ini">{{ content }}</textarea>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/raw-config-editor.js') }}?v={{ asset_version }}"></script>
+<script src="{{ url_for('static', path='/js/editor-init.js') }}?v={{ asset_version }}"></script>
+{% endblock %}

@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% from "_diagnostics_tabs.html" import diagnostics_tabs %}
+{% block title %}Diagnostics: Database - Dockkeep{% endblock %}
+
+{% block content %}
+{{ diagnostics_tabs("database") }}
+
+{% set db = database.db %}
+{% set table = database.table %}
+
+<div class="page-header">
+  <div class="page-heading">
+    <h1 class="page-title">Database</h1>
+    <p class="page-subtitle">Inspect the AppData DB in read-only mode.</p>
+  </div>
+</div>
+
+<div class="diagnostics-layout grid gap-5 lg:grid-cols-[20rem,1fr]">
+  <aside class="diagnostics-sidebar panel panel-body">
+    <nav class="diagnostics-sidebar-nav grid gap-2" aria-label="Database sections">
+      {% for group in database.groups %}
+      {% if group.tables %}
+      <div class="diagnostics-nav-section">
+        {{ group.label }}
+      </div>
+      <div class="diagnostics-table-nav grid gap-1">
+        {% for item in group.tables %}
+        <a href="{{ item.url }}"
+           class="diagnostics-table-nav-item {{ 'diagnostics-table-nav-item-active' if database.active_table == item.name else '' }}"
+           {% if database.active_table == item.name %}aria-current="page"{% endif %}>
+          <span class="diagnostics-table-label">{{ item.label }}</span>
+          <span class="diagnostics-table-count">
+            {% if item.count is not none %}{{ item.count }}{% else %}n/a{% endif %}
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <a href="/diagnostics/database?section={{ group.key }}"
+         class="diagnostics-nav-item {{ 'diagnostics-nav-item-active' if database.active_section == group.key else '' }}"
+         {% if database.active_section == group.key %}aria-current="page"{% endif %}>
+        <span>{{ group.label }}</span>
+      </a>
+      {% endif %}
+      {% endfor %}
+    </nav>
+  </aside>
+
+  <div class="grid gap-5 min-w-0">
+    {% if database.show_system_overview %}
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">System</h2>
+        <span class="badge {{ 'badge-success' if database.integrity == 'ok' else 'badge-warning' }}">
+          integrity: {{ database.integrity }}
+        </span>
+      </div>
+      <div class="panel-body">
+        <dl class="grid gap-3 md:grid-cols-2">
+          <div>
+            <dt class="text-xs font-semibold text-slate-500 dark:text-slate-400">DB path</dt>
+            <dd class="font-mono text-sm break-all">{{ db.path }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold text-slate-500 dark:text-slate-400">AppData directory</dt>
+            <dd class="font-mono text-sm break-all">{{ db.appdata_dir }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold text-slate-500 dark:text-slate-400">DB file</dt>
+            <dd>{{ "present" if db.exists else "not present" }}{% if db.size_bytes is not none %} · {{ db.size_bytes }} Bytes{% endif %}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-semibold text-slate-500 dark:text-slate-400">WAL</dt>
+            <dd>{{ "present" if db.wal_exists else "not present" }}{% if db.wal_size_bytes is not none %} · {{ db.wal_size_bytes }} Bytes{% endif %}</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">Data model</h2>
+      </div>
+      <div class="panel-body">
+        <div class="diagnostics-model-map">
+          {% for card in database.data_model %}
+          <div class="diagnostics-model-card">
+            <div class="diagnostics-model-title">{{ card.title }}</div>
+            <div class="diagnostics-model-note">{{ card.note }}</div>
+            <div class="diagnostics-model-tables">
+              {% for model_table in card.tables %}
+              <code>{{ model_table }}</code>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">Tables</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="data-table diagnostics-summary-table">
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th>Table</th>
+              <th class="text-right">entries</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for group in database.groups if group.key != "system" %}
+            {% for item in group.tables %}
+            <tr>
+              <td>{{ group.label }}</td>
+              <td>
+                <a class="text-link font-mono"
+                   href="{{ item.url }}">
+                  {{ item.name }}
+                </a>
+              </td>
+              <td class="text-right">{% if item.count is not none %}{{ item.count }}{% else %}n/a{% endif %}</td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% elif table %}
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">{{ table.label }}</h2>
+          <p class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ table.name }}</p>
+        </div>
+        {% if table.exists %}
+        <span class="badge badge-neutral">{{ table.total }} entries</span>
+        {% endif %}
+      </div>
+      {% if table.exists %}
+      {% if table.filter %}
+      <div class="diagnostics-filter-bar">
+        <span>Filter</span>
+        <code>{{ table.filter.column }} = {{ table.filter.value }}</code>
+        <a class="text-link" href="{{ table.clear_filter_url }}">reset</a>
+      </div>
+      {% endif %}
+      <div class="overflow-x-auto">
+        <table class="data-table diagnostics-db-table">
+          <colgroup>
+            {% for column in table.columns %}
+            {% set column_name = column | lower %}
+            {% if table.name == "repository_locations" and column_name in ["location_id", "repository_id"] %}
+            <col class="diagnostics-col-id-compact">
+            {% elif column_name in ["repository_location_key", "display_repository", "restore_target"] %}
+            <col class="diagnostics-col-readable">
+            {% elif column_name.endswith("_id") or column_name == "id" %}
+            <col class="diagnostics-col-id">
+            {% elif column_name.endswith("_at") %}
+            <col class="diagnostics-col-time">
+            {% elif column_name in ["status", "origin", "mode", "backend", "trigger_kind", "active", "present", "dry_run", "overwrite", "output_truncated"] %}
+            <col class="diagnostics-col-compact">
+            {% elif "json" in column_name or column_name in ["error", "output"] %}
+            <col class="diagnostics-col-wide">
+            {% else %}
+            <col>
+            {% endif %}
+            {% endfor %}
+          </colgroup>
+          <thead>
+            <tr>
+              {% for column in table.columns %}
+              <th>{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for cells in table.row_cells %}
+            {% set row_index = loop.index0 %}
+            <tr>
+              {% for cell in cells %}
+              {% set cell_dialog_id = "database-cell-dialog-" ~ table.name ~ "-" ~ row_index ~ "-" ~ loop.index0 %}
+              {% set column_name = cell.column | lower %}
+              <td class="diagnostics-cell {% if table.name == 'repository_locations' and column_name in ['location_id', 'repository_id'] %}diagnostics-cell-id-compact{% elif column_name in ['display_repository', 'repository_location_key', 'restore_target'] %}diagnostics-cell-readable{% elif column_name.endswith('_id') or column_name == 'id' %}diagnostics-cell-id{% elif 'json' in column_name or column_name in ['error', 'output', 'snapshot_paths', 'include_patterns', 'exclude_patterns'] %}diagnostics-cell-long{% elif column_name.endswith('_at') %}diagnostics-cell-time{% elif column_name in ['status', 'origin', 'mode', 'backend', 'trigger_kind', 'active', 'present', 'dry_run', 'overwrite', 'output_truncated'] %}diagnostics-cell-compact{% endif %}">
+                {% if column_name.endswith("_at") %}
+                {{ cell.value | format_datetime(seconds=true) }}
+                {% elif cell.is_long %}
+                <button type="button"
+                        class="diagnostics-cell-preview-button"
+                        data-open-dialog="{{ cell_dialog_id }}">
+                  {{ cell.preview }}
+                </button>
+                <dialog id="{{ cell_dialog_id }}" class="modal-dialog modal-dialog-wide diagnostics-cell-dialog">
+                  <div class="modal-card">
+                    <div class="modal-header">
+                      <div>
+                        <h3 class="modal-title">{{ cell.column }}</h3>
+                        <p class="diagnostics-cell-dialog-table">{{ table.name }}</p>
+                      </div>
+                      <button type="button"
+                              class="modal-close"
+                              data-close-dialog="{{ cell_dialog_id }}"
+                              aria-label="Close">
+                        ×
+                      </button>
+                    </div>
+                    <div class="modal-body">
+                      <pre class="diagnostics-cell-dialog-content">{{ cell.display }}</pre>
+                    </div>
+                    <div class="modal-actions">
+                      {% if cell.link %}
+                      <a class="btn btn-secondary btn-sm" href="{{ cell.link }}">Filter linked rows</a>
+                      {% endif %}
+                      <button type="button"
+                              class="btn btn-primary btn-sm"
+                              data-close-dialog="{{ cell_dialog_id }}">
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </dialog>
+                {% elif cell.link %}
+                <a class="diagnostics-cell-link" href="{{ cell.link }}">{{ cell.display }}</a>
+                {% else %}
+                {{ cell.display }}
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-footer flex items-center justify-between gap-3">
+        <div class="text-xs text-slate-500 dark:text-slate-400">
+          Page {{ table.page }} of {{ table.pages }}
+        </div>
+        <div class="flex items-center gap-2">
+          {% if table.previous_page %}
+          <a class="btn btn-secondary btn-sm"
+             href="{{ table.previous_page_url }}">
+            Back
+          </a>
+          {% endif %}
+          {% if table.next_page %}
+          <a class="btn btn-secondary btn-sm"
+             href="{{ table.next_page_url }}">
+            Next
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="panel-body">
+        <div class="empty-state">This table does not exist yet in the AppData DB.</div>
+      </div>
+      {% endif %}
+    </section>
+    {% else %}
+    <div class="empty-state">No table available for this section.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

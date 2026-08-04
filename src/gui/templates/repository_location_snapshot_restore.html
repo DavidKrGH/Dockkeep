@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, help_link %}
+{% block title %}Restore Snapshot - Dockkeep{% endblock %}
+
+{% block content %}
+{{ page_header(
+  "Restore snapshot",
+  repository,
+  [
+    {"label": "Repositories", "href": "/repositories"},
+    {"label": label, "href": "/repositories/locations/" ~ location_id ~ "/snapshots"},
+    {"label": snapshot_id[:8], "href": "/repositories/locations/" ~ location_id ~ "/snapshots/" ~ snapshot_id},
+    {"label": "Restore"}
+  ],
+  subtitle_mono=true
+) }}
+
+<div id="snapshot-restore-layout" class="grid gap-5">
+  <aside id="restore" class="grid gap-5">
+    <form id="repository-restore-form"
+          class="panel panel-body">
+      <input type="hidden" name="location_id" value="{{ location_id }}">
+      <input type="hidden" name="snapshot_id" value="{{ snapshot_id }}">
+
+      <div class="grid gap-4">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Configure restore</h2>
+        </div>
+
+        <dl class="grid grid-cols-[5rem,1fr] gap-y-2 text-xs">
+          <dt class="text-slate-500 dark:text-slate-400">Repository</dt>
+          <dd class="font-mono text-slate-800 dark:text-slate-200 break-all">{{ repository }}</dd>
+          <dt class="text-slate-500 dark:text-slate-400">Status</dt>
+          <dd>
+            {% if is_active %}
+            <span class="badge badge-success">{{ label }}</span>
+            {% else %}
+            <span class="badge badge-neutral">{{ label }}</span>
+            {% endif %}
+          </dd>
+          <dt class="text-slate-500 dark:text-slate-400">Snapshot</dt>
+          <dd class="font-mono text-slate-800 dark:text-slate-200 break-all">{{ snapshot_id }}</dd>
+        </dl>
+
+        <fieldset>
+          <legend class="form-label">
+            Mode
+            {{ help_link("restore", "Help: restore modes") }}
+          </legend>
+          <div class="form-grid">
+            <label class="restore-mode-option is-active">
+              <input type="radio" name="restore_mode" value="pattern" checked>
+              <span><strong class="block">Whole snapshot</strong><span class="form-help">Optionally with advanced filters.</span></span>
+            </label>
+            <label class="restore-mode-option">
+              <input type="radio" name="restore_mode" value="browser">
+              <span><strong class="block">Select files and folders</strong><span class="form-help">Select concrete paths in the browser.</span></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <section id="repository-browser-panel" class="hidden panel">
+          <div class="panel-header">
+            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">Browse files</span>
+            <span id="repository-browser-loading"
+                  class="repository-browser-loading htmx-indicator"
+                  role="status"
+                  aria-live="polite">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              <span>Loading...</span>
+            </span>
+          </div>
+          <div id="repository-browser"
+               hx-get="{{ browse_url }}&browser_mode=restore"
+               hx-trigger="load"
+               hx-swap="innerHTML"
+               hx-indicator="#repository-browser-loading">
+            <div class="p-6 text-sm text-slate-500 dark:text-slate-400">Loading snapshot contents...</div>
+          </div>
+        </section>
+
+        <div id="restore-pattern-selection" class="grid gap-3">
+          <p id="restore-pattern-explanation" class="text-sm text-slate-600 dark:text-slate-300">
+            The full snapshot will be restored.
+          </p>
+          <details id="restore-pattern-filters" class="rounded-md border border-slate-200 dark:border-slate-700 p-3">
+            <summary class="cursor-pointer text-sm font-semibold text-blue-700 dark:text-blue-300">
+              Show advanced filters
+              <span id="restore-pattern-filter-active" class="filter-active-label hidden">Filter active</span>
+            </summary>
+            <div class="mt-4 grid gap-3">
+              <label class="block">
+                <span class="form-label">Include patterns optional</span>
+                <textarea name="include_patterns"
+                          rows="4"
+                          placeholder="/data/**&#10;*.jpg"
+                          class="restore-pattern-field form-control font-mono"></textarea>
+              </label>
+              <label class="block">
+                <span class="form-label">Exclude patterns optional</span>
+                <textarea name="exclude_patterns"
+                          rows="4"
+                          placeholder="/data/cache/**&#10;*.tmp"
+                          class="restore-pattern-field form-control font-mono"></textarea>
+              </label>
+              <p class="form-help">One pattern per line. Include and exclude cannot be combined.</p>
+            </div>
+          </details>
+        </div>
+
+        <div id="restore-browser-selection" class="hidden">
+          <p id="restore-browser-explanation" class="mb-3 text-sm text-slate-600 dark:text-slate-300">
+            Select concrete files and directories from the repository browser.
+          </p>
+          <span class="form-label">Browser selection</span>
+          <input id="restore-snapshot-paths"
+                 type="hidden"
+                 name="snapshot_paths"
+                 value="/"
+                 disabled
+                 data-storage-key="dk.restore-paths.{{ location_id }}.{{ snapshot_id }}">
+          <div id="restore-selected-paths"
+               class="restore-selected-paths grid gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-3"
+               aria-live="polite">
+            <div class="flex items-center justify-between gap-2">
+              <code class="break-all text-xs text-slate-700 dark:text-slate-300">/</code>
+            </div>
+          </div>
+          <p id="restore-selected-path-count" class="form-help">
+            The whole snapshot is selected.
+          </p>
+        </div>
+
+        <label class="block">
+          <span class="form-label">Target optional</span>
+          <input name="target"
+                 placeholder="/restore/..."
+                 class="form-control font-mono">
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <input type="checkbox" name="overwrite" value="true">
+          Overwrite existing files
+        </label>
+
+        {% if needs_adhoc_credentials %}
+        <fieldset class="panel-soft p-4">
+          <legend class="px-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Ad-hoc credentials</legend>
+          <p class="form-help mb-3">
+            No configured backup currently has credentials for this location.
+            Provide one to run this restore - it will not be saved anywhere.
+            {{ help_link("restore", "Help: ad-hoc credentials") }}
+          </p>
+          <div class="grid gap-3" data-credential-scope>
+            <select name="adhoc_credential_mode" data-credential-mode class="form-control">
+              <option value="password">Password</option>
+              <option value="password_env">Environment variable</option>
+              <option value="password_file">Password file</option>
+            </select>
+            <div data-cred="password">
+              <input type="password" name="adhoc_password" class="form-control" placeholder="Repository password">
+            </div>
+            <div data-cred="env">
+              <input type="text" name="adhoc_password_env" class="form-control font-mono" placeholder="RESTIC_PASSWORD">
+            </div>
+            <div data-cred="file">
+              <input type="text" name="adhoc_password_file" class="form-control font-mono" placeholder="/run/secrets/restic.pw">
+            </div>
+          </div>
+        </fieldset>
+        {% endif %}
+
+        <p id="restore-scope-summary"
+           class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+           aria-live="polite">
+          Scope: whole snapshot
+        </p>
+
+        <div class="form-actions justify-start">
+          <button type="button"
+                  hx-post="/restore/preview"
+                  hx-include="#repository-restore-form"
+                  hx-target="#restore-preview"
+                  hx-swap="innerHTML"
+                  hx-disabled-elt="this"
+                  class="btn btn-warning">
+            Run dry-run
+          </button>
+          <button type="button"
+                  hx-post="/restore/start"
+                  hx-include="#repository-restore-form"
+                  hx-target="#restore-start"
+                  hx-swap="innerHTML"
+                  hx-disabled-elt="this"
+                  class="btn btn-primary">
+            Start restore
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <section id="restore-preview" class="panel panel-body text-sm text-slate-500 dark:text-slate-400">
+      No dry-run has been run yet.
+    </section>
+    <section id="restore-start" class="panel panel-body text-sm text-slate-500 dark:text-slate-400">
+      No restore started yet.
+    </section>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/restore.js') }}?v={{ asset_version }}" defer></script>
+{% endblock %}

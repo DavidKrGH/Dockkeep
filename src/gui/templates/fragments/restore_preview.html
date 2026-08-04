@@ -1,0 +1,30 @@
+{% from "_macros.html" import restore_selection_summary %}
+<div class="grid gap-4">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Preview</h2>
+    <span class="badge {{ 'badge-success' if preview.ok else 'badge-danger' }}">
+      {{ "OK" if preview.ok else "Error" }}
+    </span>
+  </div>
+  <dl class="grid grid-cols-[6rem,1fr] gap-y-2 text-sm">
+    <dt class="text-slate-500 dark:text-slate-400">Target</dt>
+    <dd class="font-mono text-slate-800 dark:text-slate-200 break-all">{{ preview.restore_target }}</dd>
+    <dt class="text-slate-500 dark:text-slate-400">Command</dt>
+    <dd class="font-mono text-slate-800 dark:text-slate-200 break-all">{{ preview.command }}</dd>
+    <dt class="text-slate-500 dark:text-slate-400">Mode</dt>
+    <dd class="font-mono text-slate-800 dark:text-slate-200">{{ preview.mode }}</dd>
+    <dt class="text-slate-500 dark:text-slate-400">Selection</dt>
+    <dd>{{ restore_selection_summary(preview, extra_class="m-0") }}</dd>
+  </dl>
+  {% if preview.output %}
+  <pre class="font-mono text-xs whitespace-pre-wrap text-slate-100 bg-slate-900 dark:bg-black rounded-md p-4 overflow-y-auto restore-output">{{ preview.output }}</pre>
+  {% endif %}
+  {% if preview.output_truncated %}
+    <p class="text-xs text-slate-500 dark:text-slate-400">Output truncated.</p>
+  {% endif %}
+  {% if preview.error %}
+    <div class="alert alert-danger whitespace-pre-wrap">
+      {{ preview.error }}
+    </div>
+  {% endif %}
+</div>
