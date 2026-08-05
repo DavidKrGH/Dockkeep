@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -1596,14 +1597,23 @@ class TestCmdNextRuns:
         assert "nonexistent" in capsys.readouterr().out
 
     def test_sorted_by_next_run(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        # backup at 3am comes after backup at 2am
+        # Output is ordered by next run, not by the order in the config. The next
+        # run times are fixed here: deriving them from the wall clock would flip
+        # the expected order whenever the test runs between 02:00 and 03:00.
         backup_early = MagicMock(schedule="0 2 * * *")
         backup_late = MagicMock(schedule="0 3 * * *")
+        next_runs = {
+            "0 2 * * *": datetime(2026, 1, 1, 2, 0).astimezone(),
+            "0 3 * * *": datetime(2026, 1, 1, 3, 0).astimezone(),
+        }
         job_mock = MagicMock(
             backup={"late": backup_late, "early": backup_early}, workflows={}, rclone={}
         )
         config_mock = MagicMock(jobs={"my-job": job_mock})
-        with patch("src.main.load_config", return_value=config_mock):
+        with (
+            patch("src.main.load_config", return_value=config_mock),
+            patch("src.main.next_run_datetime", side_effect=next_runs.__getitem__),
+        ):
             result = cmd_next_runs(self._args(), tmp_path / "config.toml")
         assert result == EXIT_SUCCESS
         out = capsys.readouterr().out
