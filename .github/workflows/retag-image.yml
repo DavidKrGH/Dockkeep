@@ -1,0 +1,50 @@
+name: Retag Published Image
+
+# Points an additional tag at an image that is already published, without
+# rebuilding it. Used to bootstrap a moving major tag (e.g. "1") for a release
+# that was built before that tag pattern existed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Existing tag to point at"
+        required: true
+        default: "1.0.0"
+      target:
+        description: "Tag to create or move"
+        required: true
+        default: "1"
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Point target tag at source tag
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          SOURCE: ${{ inputs.source }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          # GHCR verlangt kleingeschriebene Repository-Namen
+          image="${IMAGE,,}"
+          docker buildx imagetools create -t "${image}:${TARGET}" "${image}:${SOURCE}"
+
+          echo "::group::${image}:${SOURCE}"
+          docker buildx imagetools inspect "${image}:${SOURCE}"
+          echo "::endgroup::"
+
+          echo "::group::${image}:${TARGET}"
+          docker buildx imagetools inspect "${image}:${TARGET}"
+          echo "::endgroup::"
