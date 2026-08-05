@@ -4,6 +4,16 @@
   <Registry>https://github.com/DavidKrGH/Dockkeep/pkgs/container/dockkeep</Registry>
   <Network>bridge</Network>
 
+  <DefaultTagDescription>Every release, including new major versions</DefaultTagDescription>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Every release, including new major versions</TagDescription>
+  </Branch>
+  <Branch>
+    <Tag>1</Tag>
+    <TagDescription>Stays on the 1.x series - never upgrades to 2.0 on its own</TagDescription>
+  </Branch>
+
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
 
