@@ -1,0 +1,16 @@
+<CommunityApplications>
+  <Profile>
+Dockkeep runs scheduled [Restic](https://restic.net/) backups and [Rclone](https://rclone.org/) syncs in one container, with a web UI.
+
+You describe *what* to back up, *where to*, and *when* in the UI; Dockkeep stores that as one plain TOML file and takes care of running the jobs, pruning snapshots, mirroring repositories off-site, logging, notifying you when something breaks, and restoring files when you need them.
+
+Repositories stay ordinary Restic repositories that any `restic` binary can read, with or without Dockkeep.
+
+**The web UI has no built-in authentication.** It is an administrative interface with full access to your configuration and secrets. Keep it on a trusted network, or put it behind a VPN or an authenticating reverse proxy.
+
+Support: https://forums.unraid.net/topic/200129-support-d4v3-dockkeep/ · Bug reports: https://github.com/DavidKrGH/Dockkeep/issues
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/docs/Icon/icon_original.png</Icon>
+  <WebPage>https://github.com/DavidKrGH/Dockkeep</WebPage>
+  <Forum>https://forums.unraid.net/topic/200129-support-d4v3-dockkeep/</Forum>
+</CommunityApplications>

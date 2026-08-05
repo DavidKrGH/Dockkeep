@@ -1,0 +1,87 @@
+<Container version="2">
+  <Name>Dockkeep</Name>
+  <Repository>ghcr.io/davidkrgh/dockkeep:latest</Repository>
+  <Registry>https://github.com/DavidKrGH/Dockkeep/pkgs/container/dockkeep</Registry>
+  <Network>bridge</Network>
+
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+
+  <Icon>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/docs/Icon/icon_original.png</Icon>
+
+  <!-- NOTE: the port here is the container port, not the host port -->
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+
+  <Overview>
+    Scheduled Restic backups and Rclone syncs for your server - in one container, with a web UI.
+
+    You describe what to back up, where to, and when in the web UI. Dockkeep stores that as one plain TOML file you can still read and edit, then runs the jobs, prunes old snapshots, mirrors repositories off-site with Rclone, logs everything, notifies you when something breaks, and gets your files back when you need them.
+
+    Underneath it is plain Restic and Rclone. Dockkeep does not invent a backup format: your repositories stay ordinary Restic repositories that any restic binary can read, with or without Dockkeep.
+
+    What it does: back up mounted directories to local or cloud repositories, keep several copies with their own schedules and retention rules, prune and clean up automatically, mirror repositories off-site with Rclone, browse snapshots and restore single files or whole trees, run pre/post hooks (including stopping and starting containers), and send notifications by e-mail or Pushover.
+
+    IMPORTANT: the web UI ships WITHOUT built-in authentication. It is an administrative interface with full access to your configuration and secrets. Keep port 8080 on a trusted network, or put it behind a VPN or an authenticating reverse proxy. Do not port-forward it.
+
+    First steps after installing: open the WebUI, create a job with a backup, point it at a source path you mounted and at a repository under /backups, and set a Restic password (either directly in the config or via the DK_RESTIC_PASSWORD variable below, referenced from the config as password_env). Full documentation is in the project README.
+  </Overview>
+
+  <Support>https://forums.unraid.net/topic/200129-support-d4v3-dockkeep/</Support>
+  <Project>https://github.com/DavidKrGH/Dockkeep</Project>
+
+  <TemplateURL>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/templates/dockkeep.xml</TemplateURL>
+  <ReadMe>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/README.md</ReadMe>
+
+  <Category>Backup: Tools:Utilities</Category>
+  <ExtraSearchTerms>restic rclone backup snapshot restore retention prune offsite scheduler cron</ExtraSearchTerms>
+
+  <Requires>
+    x86_64 (amd64) host - there is no arm64 image yet.
+    The web UI has no built-in authentication; run it on a trusted network only.
+  </Requires>
+
+  <Changes>
+### 1.0.0
+First stable release. Restic backups with retention and cleanup, Rclone tasks, workflows, scheduler, restore browser, run history, hooks and notifications.
+  </Changes>
+
+  <Date>2026-08-05</Date>
+  <MinVer>6.12</MinVer>
+  <License>MIT</License>
+
+  <Screenshot>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/docs/screenshots/dashboard1.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/docs/screenshots/runs.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/docs/screenshots/restore-browser.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/DavidKrGH/Dockkeep/main/docs/screenshots/config-editor-backup.png</Screenshot>
+
+  <!-- The container hostname becomes the Restic host of every snapshot. Change it
+       here if you want your snapshots recorded under a different host name. -->
+  <ExtraParams>--hostname=dockkeep</ExtraParams>
+
+  <Config Name="WebUI" Target="8080" Default="8080" Mode="tcp" Description="Port of the Dockkeep web UI." Type="Port" Display="always" Required="true" Mask="false"/>
+
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/dockkeep/config" Mode="rw" Description="Holds config.toml and rclone.conf. Written by the web UI. Back this up somewhere outside Dockkeep - together with your repository passwords it is the only thing that cannot be regenerated." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="App data" Target="/appdata" Default="/mnt/user/appdata/dockkeep/appdata" Mode="rw" Description="SQLite database with run history, restore records, repository cache and statistics. Convenience state - can be rebuilt from the repositories." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Logs" Target="/logs" Default="/mnt/user/appdata/dockkeep/logs" Mode="rw" Description="Per-job run logs and system logs." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Repositories" Target="/backups" Default="" Mode="rw" Description="Mount point for local Restic repositories, for example /mnt/user/backups/dockkeep. Pick a share that already exists - Docker silently creates a new one otherwise, with cache settings you never chose. Do not point this at the appdata share. The actual repository paths come from your configuration; put them below this directory." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Restore target" Target="/restore" Default="" Mode="rw" Description="Where restores are written, for example /mnt/user/backups/dockkeep-restore. Dockkeep never restores outside this directory. The same advice applies: use an existing share." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Backup source 1" Target="/mnt/user/appdata" Default="/mnt/user/appdata" Mode="ro" Description="A share you want to back up, mounted read-only. This is a root, not a single backup source: everything below it can be named in your configuration, so with this mount in place a backup can use sources = [&quot;/mnt/user/appdata/paperless&quot;] or any other path underneath. Host path and container path are deliberately identical, so a path you see in Unraid is the same path in your configuration. Exclude Dockkeep's own config and appdata directories: the config holds your repository passwords, and the SQLite database cannot be copied consistently while it is in use." Type="Path" Display="always" Required="false" Mask="false"/>
+  <Config Name="Backup source 2" Target="/mnt/user/documents" Default="" Mode="ro" Description="A second share, empty by default. You only need this for a directory that is not already below the first mount - subdirectories of that one are reachable without any extra entry. Set host path and container path to the same value here as well, and use 'Add another Path, Port, Variable, Label or Device' for further shares. Leave empty if one is enough." Type="Path" Display="always" Required="false" Mask="false"/>
+
+  <Config Name="Restic password" Target="DK_RESTIC_PASSWORD" Default="" Description="Repository password. Reference it from config.toml as password_env = &quot;DK_RESTIC_PASSWORD&quot;. Leave empty if you use a password file or store the password in the configuration instead." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="Time zone" Target="TZ" Default="UTC" Description="Time zone used for schedules, next-run times and log timestamps, e.g. Europe/Berlin. Set this - it decides what '02:00' means for your schedules." Type="Variable" Display="always" Required="true" Mask="false"/>
+
+  <Config Name="Mode" Target="DK_MODE" Default="gui" Description="gui = web UI plus scheduler (recommended). cli = headless scheduler, no web UI and no persisted history." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Restic password (second repository)" Target="DK_RESTIC_PASSWORD_SECONDARY" Default="" Description="Password for a second repository, for example an off-site copy. Reference it from config.toml as password_env = &quot;DK_RESTIC_PASSWORD_SECONDARY&quot;. The variable name is only a convention - any name you reference works." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="SMTP user" Target="SMTP_USER" Default="" Description="User name for mail notifications. Reference it from the [global.notifications.mail] section as username_env = &quot;SMTP_USER&quot;. Leave empty if your mail server needs no authentication or you do not use mail notifications." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="SMTP password" Target="SMTP_PASSWORD" Default="" Description="Password for mail notifications. Reference it from the [global.notifications.mail] section as password_env = &quot;SMTP_PASSWORD&quot;." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Pushover token" Target="PUSHOVER_TOKEN" Default="" Description="Application token for Pushover notifications. Reference it from the [global.notifications.pushover] section as token_env = &quot;PUSHOVER_TOKEN&quot;." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Pushover user key" Target="PUSHOVER_USER_KEY" Default="" Description="User or group key for Pushover notifications. Reference it from the [global.notifications.pushover] section as user_key_env = &quot;PUSHOVER_USER_KEY&quot;." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+  <Config Name="Hook scripts" Target="/scripts" Default="/mnt/user/appdata/dockkeep/scripts" Mode="rw" Description="The only directory script hooks may be run from. Leave as is if you do not use hooks." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Docker socket" Target="/var/run/docker.sock" Default="" Mode="rw" Description="Optional and only needed if hooks should stop and start other containers. Granting access to the Docker socket is equivalent to root on the host - leave empty unless you need it." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Allow inline hooks" Target="DK_ALLOW_INLINE_HOOKS" Default="false" Description="Set to true to allow inline shell commands as hooks instead of script files only." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="App data retention (days)" Target="DK_APPDATA_RETENTION_DAYS" Default="" Description="Maximum age of persisted run history records. Empty means unlimited - the database grows for as long as the installation runs. 360 is a reasonable value." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="App data retention (count)" Target="DK_APPDATA_RETENTION_COUNT" Default="" Description="Maximum number of persisted records per group. Empty means unlimited. 1000 is a reasonable value." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="" Description="Optional non-root operation. Set PUID and PGID together or not at all - the container refuses to start with only one of them. Dockkeep does NOT recursively chown mounted directories; grant this user access on the host first. Leave both empty to run as root." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="PGID" Target="PGID" Default="" Description="See PUID. Both values or neither." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+</Container>
