@@ -239,8 +239,10 @@ that. Create a directory for the deployment and put two files in it:
 mkdir -p ~/dockkeep && cd ~/dockkeep
 ```
 
-**`docker-compose.yml`** — replace `/path/to/data` with the directory you want to
-back up, and add any further source mounts:
+**`docker-compose.yml`** — replace the two source mounts with the directories you
+want to back up, on both sides of the colon, and add or drop lines until the list
+matches what you have. Mounting each source under its own host path keeps the
+paths in your configuration identical to the paths you know from the host:
 
 ```yaml
 services:
@@ -262,7 +264,10 @@ services:
       - ./appdata:/appdata        # run history, restore records, repository cache
 
       # Backup sources and targets
-      - /path/to/data:/data:ro    # what you back up, read-only
+      # Each mount is a root: config.toml can use any path below it, so one line
+      # per tree is enough. Read-only, and under its own host path.
+      - /srv/data:/srv/data:ro
+      - /srv/photos:/srv/photos:ro
       - ./backups:/backups        # local repositories
       - ./restore:/restore        # restore destinations
 
@@ -324,14 +329,24 @@ To use a different port, change the left-hand side of the port mapping
 
 ### Mounting sources
 
-Back up what you mount, and mount it read-only where you can (`:ro`). Two things
-are worth knowing up front:
+Back up what you mount, and mount it read-only where you can (`:ro`). Four
+things are worth knowing up front:
 
 - **Paths in the configuration are container paths.** If you mount
-  `/srv/photos:/data/photos`, the source is `/data/photos`.
+  `/srv/photos:/data/photos`, the source is `/data/photos`, not `/srv/photos`.
 - **Snapshots record the container path.** Restoring later gives you back
   `/data/photos/...` inside the restore target. Keeping the mount layout stable
   makes restores predictable.
+- **Mount each source under its host path.** Write `/srv/photos:/srv/photos:ro`
+  instead, and there is nothing left to translate: the path on the host, the
+  source in your configuration, the path recorded in the snapshot and the path
+  you get back from a restore are all `/srv/photos`. The examples below follow
+  this, and it is what saves you from the first two points.
+- **A mount is a root, not a single source.** Everything below it can be named in
+  the configuration. With `/srv/data:/srv/data:ro` in place, a backup can just as
+  well use `sources = ["/srv/data/projects", "/srv/data/archive/2024"]` — no
+  extra mount needed. You only add a second mount for a tree the first one does
+  not already cover, which is why the example mounts `/srv/photos` separately.
 
 ### Image tags
 
@@ -379,7 +394,7 @@ retention = true
 
 [jobs.myjob.backup.local]
 repository = "/backups/myjob"
-sources    = ["/data"]
+sources    = ["/srv/data", "/srv/photos"]
 schedule   = "0 2 * * *"
 ```
 
@@ -554,7 +569,7 @@ retention = true
 
 [jobs.paperless.backup.local]
 repository = "/backups/paperless"
-sources    = ["/data/paperless"]
+sources    = ["/srv/paperless"]
 schedule   = "0 2 * * *"
 
 [jobs.paperless.rclone.offsite]
@@ -773,7 +788,7 @@ lists, and each list is set on its own level only; hooks are never inherited:
 ```toml
 [jobs.mydb.backup.local]
 repository     = "/backups/mydb"
-sources        = ["/data"]
+sources        = ["/srv/mydb"]
 pre_hooks      = ["/scripts/stop-db.sh"]
 post_hooks     = ["/scripts/start-db.sh"]
 on_error_hooks = ["/scripts/start-db.sh"]

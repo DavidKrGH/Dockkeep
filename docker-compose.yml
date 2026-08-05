@@ -17,7 +17,11 @@ services:
       - ./appdata:/appdata         # SQLite app data: run history, restore records, backup stats, run control
 
       # Backup sources and targets
-      - /path/to/data:/data:ro
+      # Mounted under their host path, so the paths in config.toml are the same
+      # paths you know from the host. Each mount is a root: config.toml can use
+      # any path below it, so one line per tree is enough.
+      - /srv/data:/srv/data:ro
+      - /srv/photos:/srv/photos:ro
       - ./backups:/backups
       - ./restore:/restore
 

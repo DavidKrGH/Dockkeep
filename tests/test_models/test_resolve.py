@@ -102,7 +102,7 @@ def test_example_config_full_job_local_resolves_expected_overrides() -> None:
     assert full_job.hooks.pre_hooks == ["/scripts/pre-job.sh"]
     assert local.repository == "/backups/full_job/local"
     assert local.credentials.password_env == "BACKUP_PASSWORD_LOCAL"
-    assert local.input.sources == ["/data/projects", "/data/documents"]
+    assert local.input.sources == ["/srv/projects", "/srv/documents"]
     assert local.input.source_files == ["/config/sources/local-extra.txt"]
     assert local.filters.exclude == ["*.tmp", "node_modules", ".venv"]
     assert local.execution.retention is True

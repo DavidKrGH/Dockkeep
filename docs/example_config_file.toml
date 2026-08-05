@@ -169,7 +169,7 @@ schedule = "0 2 * * *"
 
 # sources/source_files exist only at the backup task level. They are not
 # inherited, and there is no default in [global.backup]/[jobs.<job>.backup].
-sources = ["/data/projects", "/data/documents"]
+sources = ["/srv/projects", "/srv/documents"]
 source_files = ["/config/sources/local-extra.txt"]
 tags = ["local", "full_job"]
 # exclude/exclude_files are inheritable. These lists fully replace the inherited
@@ -286,7 +286,7 @@ notify_on_error = true
 notify_on_skipped = true
 
 [jobs.full_job.rclone.Nextcloud]
-source = "/data/documents"
+source = "/srv/documents"
 target = "nextcloud:Backups/full_job/documents"
 sync_delete = true
 schedule = "15 4 * * *"
