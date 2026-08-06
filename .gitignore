@@ -35,6 +35,8 @@ data/scripts/
 
 # Lock-Dateien (Laufzeit)
 *.lock
+# uv.lock ist kein Laufzeit-Artefakt, sondern pinnt die Dependencies des Images
+!uv.lock
 
 # Secrets & Umgebungsvariablen
 .env

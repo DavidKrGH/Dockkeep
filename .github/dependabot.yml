@@ -5,7 +5,11 @@ updates:
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "pip"
+  # uv statt pip: die Laufzeit-Dependencies stecken in uv.lock, und nur dort
+  # aendert ein Update auch wirklich das Image. Auf pyproject.toml allein wuerde
+  # Dependabot nur die untere Schranke anheben, ohne den gebauten Stand zu
+  # veraendern.
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
