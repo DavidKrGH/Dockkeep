@@ -6,6 +6,10 @@ on:
     tags: ["v*.*.*"]
   pull_request:
     branches: [main]
+  # Manueller Ausloeser als Rueckfallebene, wenn ein Push keinen Lauf erzeugt.
+  # Aus einem Branch heraus entstehen die Tags des Branches und latest, aus
+  # einem Tag heraus zusaetzlich die Semver-Tags.
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
