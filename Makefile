@@ -1,4 +1,4 @@
-.PHONY: help setup clean reset dev test lint format build run gui debug-gui debug-shell
+.PHONY: help setup clean reset dev test lint format lock build run gui debug-gui debug-shell
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -28,6 +28,7 @@ help:
 	@echo "  make dev      - Open shell with dk command available"
 	@echo "  make test     - Run tests with coverage"
 	@echo "  make lint     - Run black --check, ruff, mypy"
+	@echo "  make lock     - Refresh uv.lock (runtime dependencies of the image)"
 	@echo "  make format   - Auto-format with black and ruff"
 	@echo "  make build    - Build Docker image"
 	@echo "  make run      - Start container via docker compose"
@@ -41,6 +42,13 @@ setup:
 	$(PIP) install -r requirements-dev.txt -q
 	$(PIP) install -e . -q
 	@echo "Setup complete. Activate with: source $(VENV)/bin/activate"
+
+# uv.lock pinnt die Laufzeit-Dependencies, die ins Image gehen. --upgrade loest
+# im Rahmen der Schranken aus pyproject.toml auf den neuesten Stand auf. Nur
+# fehlende Eintraege ergaenzen und den Rest stehen lassen: `.venv/bin/uv lock`.
+lock: $(VENV)
+	$(VENV)/bin/uv lock --upgrade
+	@echo "uv.lock refreshed. Image content changes - remember to bump the version."
 
 clean:
 	rm -rf $(VENV) dockkeep.egg-info
@@ -84,8 +92,10 @@ format: $(VENV)
 	$(PYTHON) -m black src/ tests/
 	$(PYTHON) -m ruff check --fix src/ tests/
 
+# BuildKit explizit: das Dockerfile nutzt `RUN --mount`, um uv nur einzublenden
+# statt es in eine Layer zu kopieren. Seit Docker 23 ohnehin Default.
 build:
-	docker build -t dockkeep .
+	DOCKER_BUILDKIT=1 docker build -t dockkeep .
 
 run:
 	docker compose up -d
