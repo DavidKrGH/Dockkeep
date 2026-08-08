@@ -9,8 +9,12 @@ updates:
   # aendert ein Update auch wirklich das Image. Auf pyproject.toml allein wuerde
   # Dependabot nur die untere Schranke anheben, ohne den gebauten Stand zu
   # veraendern.
+  # lockfile-only: nur uv.lock aktualisieren, die Schranken in pyproject.toml
+  # in Ruhe lassen. Eine angehobene Schranke aendert das Image nicht, weil das
+  # Lockfile bestimmt, was installiert wird.
   - package-ecosystem: "uv"
     directory: "/"
+    versioning-strategy: lockfile-only
     schedule:
       interval: "weekly"
 
