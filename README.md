@@ -2,8 +2,10 @@
   <img src="docs/Icon/icon_name.png" alt="Dockkeep" width="380">
 </p>
 
+<h1 align="center">Self-hosted Restic backups and Rclone syncs, with a web UI</h1>
+
 <p align="center">
-  <strong>Scheduled Restic backups and Rclone syncs for your home server — in one container, with a web UI.</strong>
+  <strong>Scheduled backups for your home server, NAS, or Unraid box — all in one container.</strong>
 </p>
 
 ---
@@ -22,8 +24,8 @@ not hide the tools: your repositories stay ordinary Restic repositories that any
 you need your data back is the worst possible day to depend on a tool that is
 also broken.
 
-It is built for local, trusted environments: home servers, homelabs, NAS boxes,
-small internal machines.
+It is built for local, trusted environments: self-hosted home servers, homelabs,
+NAS and Unraid boxes, small internal machines.
 
 > **Versioning.** Dockkeep follows semantic versioning: the configuration
 > format and the container contract stay compatible within a major version, and
@@ -326,6 +328,27 @@ first one from there.
 
 To use a different port, change the left-hand side of the port mapping
 (`"9090:8080"`); the container always listens on 8080 internally.
+
+### Unraid
+
+On Unraid you do not need a Compose file. Dockkeep ships an Unraid Community
+Applications template: open the *Apps* tab, search for **Dockkeep**, and install
+it. The template sets the same volumes and variables as the Compose example
+above, with the paths pointed at the usual `/mnt/user/...` shares, and it lets
+you pick between the `latest` and `1` image tags.
+
+Two Unraid-specific notes:
+
+- **Pick shares that already exist** for the repository and restore paths.
+  Docker silently creates a new share otherwise, with cache settings you never
+  chose.
+- **Exclude Dockkeep's own `config` and `appdata` directories** from the backup
+  sources. The config holds your repository passwords, and the SQLite database
+  cannot be copied consistently while it is in use.
+
+The template lives at [`templates/dockkeep.xml`](templates/dockkeep.xml) in this
+repository, and questions about the Unraid build belong in the
+[support thread](https://forums.unraid.net/topic/200129-support-d4v3-dockkeep/).
 
 ### Mounting sources
 
