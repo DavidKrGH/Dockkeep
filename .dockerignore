@@ -47,7 +47,6 @@ docker-compose*.yml
 
 # Dev-Tools
 Makefile
-requirements-dev.txt
 skills
 .claude/
 .codex/

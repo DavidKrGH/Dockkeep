@@ -36,19 +36,29 @@ help:
 	@echo "  make debug-gui - Start GUI under debugpy on port 8080; attach debugger on 5678"
 	@echo "  make debug-shell - Open shell with dk and dk-debug commands available"
 
+# Installiert exakt die Versionen aus uv.lock, Laufzeit- wie Dev-Dependencies,
+# hash-geprueft. Damit sieht die Entwicklungsumgebung dieselben Laufzeit-
+# Versionen wie das Image. uv wird zum Bootstrap kurz ungepinnt geholt und
+# gleich darauf von der im Lockfile gepinnten Version ueberschrieben.
+# `--locked` bricht ab, wenn uv.lock nicht zu pyproject.toml passt - dann fehlt
+# ein `make lock`.
 setup:
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip -q
-	$(PIP) install -r requirements-dev.txt -q
-	$(PIP) install -e . -q
+	$(PIP) install uv -q
+	$(VENV)/bin/uv export --locked --all-groups --no-emit-project \
+		--format requirements-txt -o $(VENV)/requirements.lock -q
+	$(PIP) install --require-hashes --no-deps -r $(VENV)/requirements.lock -q
+	$(PIP) install --no-deps -e . -q
 	@echo "Setup complete. Activate with: source $(VENV)/bin/activate"
 
-# uv.lock pinnt die Laufzeit-Dependencies, die ins Image gehen. --upgrade loest
-# im Rahmen der Schranken aus pyproject.toml auf den neuesten Stand auf. Nur
-# fehlende Eintraege ergaenzen und den Rest stehen lassen: `.venv/bin/uv lock`.
+# uv.lock pinnt Laufzeit- und Dev-Dependencies. --upgrade loest im Rahmen der
+# Schranken aus pyproject.toml auf den neuesten Stand auf. Nur fehlende
+# Eintraege ergaenzen und den Rest stehen lassen: `.venv/bin/uv lock`.
 lock: $(VENV)
 	$(VENV)/bin/uv lock --upgrade
-	@echo "uv.lock refreshed. Image content changes - remember to bump the version."
+	@echo "uv.lock refreshed. Run 'make reset' to install the new versions."
+	@echo "Runtime dependencies changed? Image content changes - bump the version."
 
 clean:
 	rm -rf $(VENV) dockkeep.egg-info

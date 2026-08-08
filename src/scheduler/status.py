@@ -220,13 +220,13 @@ def _format_dt(value: datetime | None) -> str | None:
 
 def _coerce_state(value: object) -> SchedulerState:
     if value in {"running", "stopped", "config_error", "scheduler_lock_error"}:
-        return value  # type: ignore[return-value]
+        return value
     return "unknown"
 
 
 def _coerce_owner(value: object) -> SchedulerOwner | None:
     if value in {"gui", "scheduler-cli"}:
-        return value  # type: ignore[return-value]
+        return value
     return None
 
 
