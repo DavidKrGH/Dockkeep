@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -9,7 +10,37 @@ from src.utils.rclone import (
     async_check_remote,
     async_list_remotes,
     parse_remote_name,
+    resolve_config_path,
 )
+
+
+def test_resolve_config_path_prefers_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    override = tmp_path / "custom.conf"
+    monkeypatch.setenv("RCLONE_CONFIG", str(override))
+    assert resolve_config_path(tmp_path / "config") == override
+
+
+def test_resolve_config_path_uses_given_config_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+    assert resolve_config_path(tmp_path) == tmp_path / "rclone.conf"
+
+
+def test_resolve_config_path_falls_back_to_config_dir_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+    monkeypatch.setenv("DK_CONFIG_DIR", str(tmp_path))
+    assert resolve_config_path() == tmp_path / "rclone.conf"
+
+
+def test_resolve_config_path_falls_back_to_container_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+    monkeypatch.delenv("DK_CONFIG_DIR", raising=False)
+    assert resolve_config_path() == Path("/config/rclone.conf")
 
 
 def test_parse_remote_name_simple() -> None:

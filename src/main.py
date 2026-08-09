@@ -46,6 +46,7 @@ from .services.run_manager import (
 from .services.scheduling import next_run_datetime
 from .services.terminal_hooks import terminal_notification_only_hook
 from .utils.logging import log_base_dir, setup_system_logger
+from .utils.rclone import resolve_config_path as resolve_rclone_config_path
 from .utils.restic import resolve_env
 from .utils.targets import parse_task_selector
 from .utils.validation import collect_config_warnings, load_config
@@ -1147,13 +1148,32 @@ def _cmd_shell_all_overview(config: ResolvedAppConfig) -> int:
     return EXIT_SUCCESS
 
 
-def _cmd_shell_backup(job_name: str, backup_name: str, backup: ResolvedBackupConfig) -> int:
+def _shell_rclone_config(env: dict[str, str], config_dir: Path | None) -> str:
+    """Setzt RCLONE_CONFIG in der Shell-Umgebung und gibt den Pfad zurueck.
+
+    Nötig, weil ``docker exec`` das Entrypoint-Skript nicht durchläuft und
+    RCLONE_CONFIG dort deshalb nicht gesetzt ist. Ohne diese Ergänzung würde
+    rclone in der Shell seine eigene Default-Config statt der von Dockkeep
+    benutzten lesen.
+    """
+    path = str(resolve_rclone_config_path(config_dir))
+    env["RCLONE_CONFIG"] = path
+    return path
+
+
+def _cmd_shell_backup(
+    job_name: str,
+    backup_name: str,
+    backup: ResolvedBackupConfig,
+    config_dir: Path | None = None,
+) -> int:
     """Spawns a shell with RESTIC_REPOSITORY and password env vars set."""
     env = resolve_env(
         password=backup.credentials.password,
         password_file=backup.credentials.password_file,
     )
     env["RESTIC_REPOSITORY"] = backup.repository
+    rclone_config = _shell_rclone_config(env, config_dir)
 
     lines: list[str] = [f"RESTIC_REPOSITORY    = {backup.repository}"]
     if backup.credentials.password_file is not None:
@@ -1166,6 +1186,8 @@ def _cmd_shell_backup(job_name: str, backup_name: str, backup: ResolvedBackupCon
             "but was not set (or empty) when the config was loaded — no restic "
             "password is available in this shell."
         )
+    if backup.repository.startswith("rclone:"):
+        lines.append(f"RCLONE_CONFIG        = {rclone_config}")
     lines.append("")
     lines.append("Example commands:")
     lines.append("  restic snapshots")
@@ -1180,10 +1202,18 @@ def _cmd_shell_backup(job_name: str, backup_name: str, backup: ResolvedBackupCon
 
 
 def _cmd_shell_rclone(
-    job_name: str, rclone_name: str, rclone_task: ResolvedRcloneSyncTaskConfig
+    job_name: str,
+    rclone_name: str,
+    rclone_task: ResolvedRcloneSyncTaskConfig,
+    config_dir: Path | None = None,
 ) -> int:
-    """Spawns a shell with rclone context info printed."""
+    """Spawns a shell with RCLONE_CONFIG set and rclone context info printed."""
+    env = dict(os.environ)
+    rclone_config = _shell_rclone_config(env, config_dir)
+
     lines: list[str] = [
+        f"RCLONE_CONFIG = {rclone_config}",
+        "",
         f"Source:  {rclone_task.source}",
         f"Target:  {rclone_task.target}",
         "",
@@ -1195,7 +1225,7 @@ def _cmd_shell_rclone(
     ]
 
     _print_shell_banner(f" {job_name} / rclone.{rclone_name} ", lines)
-    return _spawn_shell(dict(os.environ))
+    return _spawn_shell(env)
 
 
 def cmd_shell(args: argparse.Namespace, config_path: Path) -> int:
@@ -1240,13 +1270,17 @@ def cmd_shell(args: argparse.Namespace, config_path: Path) -> int:
         if parsed.name not in job_config.rclone:
             print(f"✗ Rclone task '{task_selector}' not found in job '{job_name}'")
             return EXIT_CONFIG_ERROR
-        return _cmd_shell_rclone(job_name, parsed.name, job_config.rclone[parsed.name])
+        return _cmd_shell_rclone(
+            job_name, parsed.name, job_config.rclone[parsed.name], config_path.parent
+        )
 
     if parsed.kind == "backup":
         if parsed.name not in job_config.backup:
             print(f"✗ Backup '{task_selector}' not found in job '{job_name}'")
             return EXIT_CONFIG_ERROR
-        return _cmd_shell_backup(job_name, parsed.name, job_config.backup[parsed.name])
+        return _cmd_shell_backup(
+            job_name, parsed.name, job_config.backup[parsed.name], config_path.parent
+        )
 
     print(
         f"✗ Task '{task_selector}' not found in job '{job_name}'. "

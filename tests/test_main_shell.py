@@ -174,6 +174,19 @@ class TestCmdShellBackup:
         assert env["RESTIC_PASSWORD_FILE"] == str(pw_file)
         assert "RESTIC_PASSWORD" not in env
 
+    def test_sets_rclone_config_for_rclone_backed_repository(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Restic spawns rclone for rclone: repositories and needs the same config."""
+        monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+        backup = self._make_backup(repository="rclone:myrclone:bucket/myjob")
+        with patch("src.main.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            _cmd_shell_backup("myjob", "mybackup", backup, tmp_path)
+        env = mock_run.call_args[1]["env"]
+        assert env["RCLONE_CONFIG"] == str(tmp_path / "rclone.conf")
+        assert str(tmp_path / "rclone.conf") in capsys.readouterr().err
+
     def test_returns_shell_exit_code(self) -> None:
         backup = self._make_backup()
         with patch("src.main.subprocess.run") as mock_run:
@@ -241,6 +254,43 @@ class TestCmdShellRclone:
         assert "RESTIC_REPOSITORY" not in env
         assert "RESTIC_PASSWORD" not in env
 
+    def test_sets_rclone_config_from_config_dir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """docker exec skips the entrypoint, so the shell must set RCLONE_CONFIG itself."""
+        monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+        rclone = ResolvedRcloneSyncTaskConfig(source="/data", target="remote:dest")
+        with patch("src.main.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            _cmd_shell_rclone("myjob", "main", rclone, tmp_path)
+        env = mock_run.call_args[1]["env"]
+        assert env["RCLONE_CONFIG"] == str(tmp_path / "rclone.conf")
+
+    def test_keeps_explicit_rclone_config(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        override = tmp_path / "custom.conf"
+        monkeypatch.setenv("RCLONE_CONFIG", str(override))
+        rclone = ResolvedRcloneSyncTaskConfig(source="/data", target="remote:dest")
+        with patch("src.main.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            _cmd_shell_rclone("myjob", "main", rclone, tmp_path)
+        env = mock_run.call_args[1]["env"]
+        assert env["RCLONE_CONFIG"] == str(override)
+
+    def test_banner_shows_rclone_config(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+        rclone = ResolvedRcloneSyncTaskConfig(source="/data", target="remote:dest")
+        with patch("src.main.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            _cmd_shell_rclone("myjob", "main", rclone, tmp_path)
+        assert str(tmp_path / "rclone.conf") in capsys.readouterr().err
+
 
 class TestCmdShell:
     def _make_args(self, target: str) -> MagicMock:
@@ -292,8 +342,8 @@ class TestCmdShell:
         ):
             mock_load.return_value = MagicMock(jobs={"myjob": job})
             mock_rclone.return_value = EXIT_SUCCESS
-            result = cmd_shell(args, Path("config.toml"))
-        mock_rclone.assert_called_once_with("myjob", "main", rclone)
+            result = cmd_shell(args, Path("/config/config.toml"))
+        mock_rclone.assert_called_once_with("myjob", "main", rclone, Path("/config"))
         assert result == EXIT_SUCCESS
 
     def test_shell_mode_backup_dispatched(self) -> None:
@@ -309,6 +359,6 @@ class TestCmdShell:
         ):
             mock_load.return_value = MagicMock(jobs={"myjob": job})
             mock_backup.return_value = EXIT_SUCCESS
-            result = cmd_shell(args, Path("config.toml"))
-        mock_backup.assert_called_once_with("myjob", "mybackup", backup)
+            result = cmd_shell(args, Path("/config/config.toml"))
+        mock_backup.assert_called_once_with("myjob", "mybackup", backup, Path("/config"))
         assert result == EXIT_SUCCESS

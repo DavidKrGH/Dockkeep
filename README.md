@@ -695,7 +695,11 @@ must be an absolute path that exists when the configuration is loaded.
 
 Rclone remotes live in a single `rclone.conf` (default `/config/rclone.conf`,
 overridable with `RCLONE_CONFIG`). Everything uses that one file: the UI, Rclone
-tasks, and Restic repositories on the `rclone:` backend.
+tasks, Restic repositories on the `rclone:` backend, and every `rclone` you run
+yourself inside the container — `dk shell`, an interactive `bash`, or a direct
+`docker exec dockkeep rclone …`. You never have to point rclone at the file by
+hand with `--config`; it only ignores that file when you set `RCLONE_CONFIG`
+explicitly, and then every one of those callers follows you to the new path.
 
 Three ways to fill it:
 

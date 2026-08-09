@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from ..core.subprocesses import run_command
+from ..utils.rclone import RCLONE_CONFIG_ENV, resolve_config_path
 from .config import _atomic_write_text
 from .errors import ServiceError
 from .output import limit_output
@@ -111,10 +112,20 @@ class RcloneService:
         self._config_dir = config_dir
 
     def config_path(self) -> Path:
-        env_path = os.environ.get("RCLONE_CONFIG")
-        if env_path:
-            return Path(env_path)
-        return self._config_dir / "rclone.conf"
+        return resolve_config_path(self._config_dir)
+
+    def _command_env(self) -> dict[str, str]:
+        """Umgebung fuer rclone-Subprozesse mit explizit gesetzter Config.
+
+        Ohne das wuerden Schreibzugriffe (``rclone config create``) und Tests
+        (``rclone lsd``) rclones Default-Config nehmen, waehrend der Service
+        selbst aus ``config_path()`` liest. Im Container setzt das Entrypoint
+        denselben Wert; ausserhalb, etwa im Dev-Betrieb ohne Entrypoint, faellt
+        sonst Lesen und Schreiben auseinander.
+        """
+        env = os.environ.copy()
+        env[RCLONE_CONFIG_ENV] = str(self.config_path())
+        return env
 
     def _read_config_sync(self) -> RcloneConfigView:
         path = self.config_path()
@@ -315,6 +326,7 @@ class RcloneService:
         try:
             result = await run_command(
                 ["rclone", "lsd", f"{remote}:"],
+                env=self._command_env(),
                 timeout=RCLONE_DIAGNOSTIC_TIMEOUT,
             )
             raw_output = (result.stdout + result.stderr).strip()
@@ -443,7 +455,9 @@ class RcloneService:
         errors: dict[str, str],
     ) -> RcloneView:
         try:
-            result = await run_command(argv, timeout=RCLONE_DIAGNOSTIC_TIMEOUT)
+            result = await run_command(
+                argv, env=self._command_env(), timeout=RCLONE_DIAGNOSTIC_TIMEOUT
+            )
             raw_output = (result.stdout + result.stderr).strip()
             output, truncated = limit_output(raw_output)
             ok = result.returncode == 0

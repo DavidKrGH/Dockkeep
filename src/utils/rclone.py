@@ -8,10 +8,37 @@ tests without instantiating a full executor.
 """
 
 import logging
+import os
+from pathlib import Path
 
 from ..core.subprocesses import run_command
 
 logger = logging.getLogger(__name__)
+
+RCLONE_CONFIG_ENV = "RCLONE_CONFIG"
+DEFAULT_CONFIG_DIR = Path("/config")
+
+
+def resolve_config_path(config_dir: Path | None = None) -> Path:
+    """Ermittelt die rclone.conf, die Dockkeep verwendet.
+
+    Vorrang hat ein gesetztes ``RCLONE_CONFIG``. Sonst gilt ``rclone.conf``
+    im Config-Verzeichnis: entweder dem uebergebenen, sonst ``$DK_CONFIG_DIR``
+    bzw. dem Default ``/config``.
+
+    Args:
+        config_dir: Config-Verzeichnis des Aufrufers (z. B. das Verzeichnis der
+            aktiven ``config.toml``). None faellt auf die Env-Defaults zurueck.
+
+    Returns:
+        Pfad zur effektiven rclone.conf.
+    """
+    env_path = os.environ.get(RCLONE_CONFIG_ENV)
+    if env_path:
+        return Path(env_path)
+    if config_dir is not None:
+        return config_dir / "rclone.conf"
+    return Path(os.environ.get("DK_CONFIG_DIR", str(DEFAULT_CONFIG_DIR))) / "rclone.conf"
 
 
 def parse_remote_name(remote: str) -> str:

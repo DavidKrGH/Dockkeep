@@ -8,7 +8,23 @@ FROM ghcr.io/astral-sh/uv:0.12.3@sha256:2d890623d310b57771ce840f0da5eed5fc6d657d
 FROM python:3.12-bookworm@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12
 
 COPY --from=restic-bin /usr/bin/restic /usr/local/bin/restic
-COPY --from=rclone-bin /usr/local/bin/rclone /usr/local/bin/rclone
+COPY --from=rclone-bin /usr/local/bin/rclone /usr/local/libexec/rclone
+
+# rclone laeuft ueber einen Wrapper, damit jeder Aufruf im Container dieselbe
+# rclone.conf sieht wie Dockkeep. Noetig, weil `docker exec` das
+# Entrypoint-Skript nicht durchlaeuft und RCLONE_CONFIG dort deshalb fehlt;
+# ohne Wrapper wuerde `docker exec ... rclone config` in rclones eigene
+# Default-Config unter ~/.config/rclone/rclone.conf schreiben. Ein explizit
+# gesetztes RCLONE_CONFIG bleibt unangetastet.
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'if [ -z "${RCLONE_CONFIG}" ]; then' \
+    '    RCLONE_CONFIG="${DK_CONFIG_DIR:-/config}/rclone.conf"' \
+    '    export RCLONE_CONFIG' \
+    'fi' \
+    'exec /usr/local/libexec/rclone "$@"' \
+    > /usr/local/bin/rclone \
+    && chmod 0755 /usr/local/bin/rclone
 
 # gosu für optionalen non-root Modus und Basis-Tools für Hooks
 RUN apt-get update && apt-get install -y --no-install-recommends \

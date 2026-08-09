@@ -16,9 +16,11 @@ for `TZ` and `DK_MODE`.
 
 ## Summary
 
-- In the Docker entrypoint, `RCLONE_CONFIG` always falls back to
-  `$DK_CONFIG_DIR/rclone.conf`. With no further settings, that is
-  `/config/rclone.conf`.
+- `RCLONE_CONFIG` always falls back to `$DK_CONFIG_DIR/rclone.conf`. With no
+  further settings, that is `/config/rclone.conf`. The entrypoint exports that
+  fallback for the runtime; because `docker exec` bypasses the entrypoint, the
+  `rclone` wrapper in the image and `dk shell` apply the same fallback again for
+  calls made by hand.
 - `TZ` has no Dockkeep code-level default. Without `TZ`, Python uses the local
   timezone of the container/system, which is usually UTC in standard containers.
   The example Compose file deliberately sets `Europe/Berlin`.
@@ -46,7 +48,7 @@ that the example deployment should actively set.
 | `DK_ALLOW_INLINE_HOOKS` | document only in `.env.example` | The safe default stays off; only the exact value `true` enables inline hooks |
 | `DK_APPDATA_RETENTION_DAYS`, `DK_APPDATA_RETENTION_COUNT` | document only in `.env.example` | AppData retention stays opt-in |
 | `PUID`, `PGID` | document only in `.env.example` | With neither value set, the container runs as root; with both set, the entrypoint uses `gosu`; setting only one is a startup error |
-| `RCLONE_CONFIG` | do not set in Compose | The entrypoint automatically sets `$DK_CONFIG_DIR/rclone.conf`, so the default is `/config/rclone.conf` |
+| `RCLONE_CONFIG` | do not set in Compose | The image falls back to `$DK_CONFIG_DIR/rclone.conf` on its own, so the default is `/config/rclone.conf` |
 | `DK_CONFIG_DIR`, `DK_LOG_DIR`, `DK_BACKUP_DIR`, `DK_LOCK_DIR`, `DK_SCRIPTS_DIR`, `DK_RESTORE_DIR`, `DK_APPDATA_DIR` | do not set in Compose | Container paths are represented through volumes and entrypoint defaults |
 | `DK_STATS_TIMEOUT`, `DK_BROWSE_TIMEOUT`, `DK_NOTIFICATION_TIMEOUT`, `DK_SIGTERM_GRACE_PERIOD` | do not set in Compose | Code defaults are sufficient; overrides belong in a local customization only when needed |
 

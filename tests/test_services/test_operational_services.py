@@ -627,7 +627,10 @@ def test_rclone_remote_view_success_runs_diagnostic(
     with patch("src.services.rclone.run_command", AsyncMock(return_value=lsd_result)) as run_mock:
         view = asyncio.run(service.test_remote_view("drive"))
 
-    run_mock.assert_awaited_once_with(["rclone", "lsd", "drive:"], timeout=15)
+    run_mock.assert_awaited_once()
+    assert run_mock.await_args.args[0] == ["rclone", "lsd", "drive:"]
+    assert run_mock.await_args.kwargs["timeout"] == 15
+    assert run_mock.await_args.kwargs["env"]["RCLONE_CONFIG"] == str(config_path)
     assert view == {
         "status": "ok",
         "tone": "success",
@@ -831,6 +834,28 @@ def test_rclone_update_skips_empty_fields_and_passwords(
         "new.example",
         "--non-interactive",
     ]
+
+
+def test_rclone_commands_pin_config_to_the_file_the_service_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Writes and reads must agree even without the entrypoint exporting RCLONE_CONFIG."""
+    monkeypatch.delenv("RCLONE_CONFIG", raising=False)
+    service = RcloneService(tmp_path)
+    command_result = CommandResult(0, stdout="", stderr="")
+
+    with patch(
+        "src.services.rclone.run_command",
+        AsyncMock(return_value=command_result),
+    ) as run_mock:
+        asyncio.run(service.delete_remote("nas"))
+        asyncio.run(service.test_remote("nas"))
+
+    expected = str(tmp_path / "rclone.conf")
+    assert expected == str(service.config_path())
+    for call in run_mock.call_args_list:
+        assert call.kwargs["env"]["RCLONE_CONFIG"] == expected
 
 
 def test_rclone_edit_form_omits_rclone_password_but_keeps_plain_secret(
