@@ -2,7 +2,7 @@
 # Artefakt ergibt. Der Tag bleibt zur Lesbarkeit stehen, bindend ist der Digest.
 # Dependabot haelt die Digests aktuell.
 FROM restic/restic:0.19.1@sha256:136600b6ff6843d61d355f7f71f460a166429f35de6fd11b568fece3c9a4d510 AS restic-bin
-FROM rclone/rclone:v1.74-stable@sha256:2446d4214067d944640e0646a733b36c8d205542e2ed7d75c4729a7ec7443dd2 AS rclone-bin
+FROM rclone/rclone:v1.75-stable@sha256:03c74334e3fb4c807943a15b84a598c0704a673020f5bdc0b62194b1106ce276 AS rclone-bin
 FROM ghcr.io/astral-sh/uv:0.12.3@sha256:2d890623d310b57771ce840f0da5eed5fc6d657da05ffaa45d82797b53fa3abc AS uv-bin
 
 FROM python:3.12-bookworm@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291aeb4677e0547817c10b12
